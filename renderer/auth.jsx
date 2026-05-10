@@ -30,7 +30,7 @@ function AuthScreen({ onAuth }) {
             <img src="./assets/logo.png" style={{ width: 32, height: 32, objectFit: 'contain' }} />
           </div>
           <h1 className="auth-title">REBORNMC</h1>
-          <p className="auth-version">Launcher v1.0.2</p>
+          <p className="auth-version">Launcher v1.0.3</p>
         </div>
 
         <div className="auth-form">

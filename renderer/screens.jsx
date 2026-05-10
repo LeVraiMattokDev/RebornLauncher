@@ -16,7 +16,7 @@ function HomeScreen({ onPlay, username, skinUrl, serverInfo = {} }) {
           <span className="hero-tag"><span className="pulse" /> V2 Out !</span>
           <div>
             <h1 className="hero-headline">Joue à un serveur<span className="ember"> UNIQUE.</span></h1>
-            <p className="hero-desc">Rejoins RebornMC et vis une expérience Minecraft unique.{online ? ` ${players.toLocaleString('fr-FR')} joueurs connectés maintenant.` : ' Serveur hors-ligne.'}</p>
+            <p className="hero-desc">Rejoins RebornMC et vis une expérience Minecraft unique.{online ? ` ${players.toLocaleString('fr-FR')} joueurs connectés maintenant.` : ' Serveur indisponible.'}</p>
             <div className="hero-meta">
               {online
                 ? <span><b>{players.toLocaleString('fr-FR')}</b> en ligne</span>

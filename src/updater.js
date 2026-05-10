@@ -1,5 +1,4 @@
 const https = require('https');
-const crypto = require('crypto');
 
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
@@ -32,27 +31,13 @@ async function checkForUpdates(currentVersion, githubRepo) {
 }
 
 async function getSkinUrl(username) {
-  // Try real Mojang UUID first (works for users registered on Mojang)
   try {
     const profile = await fetchJSON(`https://api.mojang.com/users/profiles/minecraft/${username}`);
     if (profile && profile.id) {
       return `https://crafatar.com/skins/${profile.id}?overlay`;
     }
   } catch (_) {}
-
-  // Offline UUID: nameUUIDFromBytes(MD5("OfflinePlayer:" + name))
-  const md5 = crypto.createHash('md5').update(`OfflinePlayer:${username}`).digest();
-  md5[6] = (md5[6] & 0x0f) | 0x30;
-  md5[8] = (md5[8] & 0x3f) | 0x80;
-  const uuid = [
-    md5.subarray(0, 4),
-    md5.subarray(4, 6),
-    md5.subarray(6, 8),
-    md5.subarray(8, 10),
-    md5.subarray(10, 16),
-  ].map(b => b.toString('hex')).join('-');
-
-  return `https://crafatar.com/skins/${uuid}?overlay`;
+  return null;
 }
 
 module.exports = { checkForUpdates, getSkinUrl };
