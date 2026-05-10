@@ -1,0 +1,5 @@
+# --- Mods interdits ---
+xray
+wurst
+hacked
+meteor

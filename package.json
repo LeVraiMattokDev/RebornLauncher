@@ -1,0 +1,39 @@
+{
+  "name": "reborn-launcher",
+  "version": "1.0.0",
+  "description": "RebornMC Minecraft Launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "fr.rebornmc.launcher",
+    "productName": "RebornMC Launcher",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "src/**",
+      "mod_ban/**",
+      "assets/**",
+      "node_modules/**"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "minecraft-launcher-core": "^3.17.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^26.8.1"
+  }
+}

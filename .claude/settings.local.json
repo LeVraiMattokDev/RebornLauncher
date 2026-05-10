@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(zcat webfetch-1778404713871-glrxmy.bin)",
+      "Bash(gunzip -c webfetch-1778404713871-glrxmy.bin)",
+      "Bash(tar -x)",
+      "Bash(npm install:*)",
+      "Bash(node_modules/.bin/electron --version)",
+      "Bash(node -e \"require\\('./src/config'\\)\")",
+      "Bash(node:*)",
+      "Bash(npm show:*)"
+    ]
+  },
+  "disabledMcpjsonServers": [
+    "claude-flow"
+  ]
+}
