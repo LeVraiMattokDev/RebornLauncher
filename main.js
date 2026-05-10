@@ -98,13 +98,6 @@ app.whenReady().then(() => {
   const { getSkinUrl } = require('./src/updater');
   ipcMain.handle('get-skin-url', (_e, username) => getSkinUrl(username));
 
-  // ── Update check ─────────────────────────────────────────────────────────
-  const { checkForUpdates } = require('./src/updater');
-  ipcMain.handle('check-updates', async () => {
-    const cfg = configModule.load();
-    return checkForUpdates(app.getVersion(), cfg.githubRepo);
-  });
-
   ipcMain.handle('open-url', (_e, url) => { shell.openExternal(url); });
 
   // ── Server ping ───────────────────────────────────────────────────────────
@@ -228,6 +221,30 @@ app.whenReady().then(() => {
       return { success: false, error: e.message };
     }
   });
+
+  // ── Auto-updater ──────────────────────────────────────────────────────────
+  if (app.isPackaged) {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.autoDownload = false;
+
+    autoUpdater.on('update-available', info => {
+      mainWindow?.webContents.send('updater-available', { version: info.version });
+    });
+    autoUpdater.on('download-progress', progress => {
+      mainWindow?.webContents.send('updater-progress', { percent: Math.round(progress.percent) });
+    });
+    autoUpdater.on('update-downloaded', info => {
+      mainWindow?.webContents.send('updater-ready', { version: info.version });
+    });
+    autoUpdater.on('error', err => {
+      console.error('[updater]', err.message);
+    });
+
+    ipcMain.handle('updater-download', () => autoUpdater.downloadUpdate());
+    ipcMain.on('updater-install', () => autoUpdater.quitAndInstall(false, true));
+
+    autoUpdater.checkForUpdates().catch(err => console.error('[updater check]', err.message));
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

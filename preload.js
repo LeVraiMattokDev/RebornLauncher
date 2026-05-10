@@ -14,8 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSkinUrl: (username) => ipcRenderer.invoke('get-skin-url', username),
 
   // Updates
-  checkUpdates: () => ipcRenderer.invoke('check-updates'),
-  openUrl:      (url) => ipcRenderer.invoke('open-url', url),
+  openUrl:         (url) => ipcRenderer.invoke('open-url', url),
+  updaterDownload: ()    => ipcRenderer.invoke('updater-download'),
+  updaterInstall:  ()    => ipcRenderer.send('updater-install'),
 
   // Mod list
   listMods: () => ipcRenderer.invoke('list-mods'),
@@ -35,7 +36,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Event listeners (renderer ← main)
   on: (channel, cb) => {
-    const valid = ['launch-progress', 'launch-data', 'launch-close', 'launch-error'];
+    const valid = ['launch-progress', 'launch-data', 'launch-close', 'launch-error',
+                   'updater-available', 'updater-progress', 'updater-ready'];
     if (valid.includes(channel)) ipcRenderer.on(channel, (_e, ...args) => cb(...args));
   },
   off: (channel, cb) => ipcRenderer.removeListener(channel, cb),

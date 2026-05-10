@@ -5,20 +5,48 @@
 
 const { useState, useEffect } = React;
 
-function UpdateBanner({ info, onDismiss }) {
-  return (
+function UpdateBanner({ update, onDismiss }) {
+  const { status, version, percent } = update;
+
+  if (status === 'available') return (
     <div className="update-banner">
       <span className="update-dot" />
-      <span>Mise à jour disponible : <b>v{info.version}</b></span>
+      <span>Mise à jour disponible : <b>v{version}</b></span>
       <button className="btn btn-sm btn-primary" style={{ marginLeft: 8 }}
-        onClick={() => window.electronAPI.openUrl(info.url)}>
-        Voir
+        onClick={() => window.electronAPI.updaterDownload()}>
+        Télécharger
       </button>
       <button className="btn btn-sm btn-ghost" style={{ marginLeft: 4 }} onClick={onDismiss}>
         Ignorer
       </button>
     </div>
   );
+
+  if (status === 'downloading') return (
+    <div className="update-banner">
+      <span className="update-dot" />
+      <span>Téléchargement v{version}… <b>{percent}%</b></span>
+      <div style={{ flex: 1, maxWidth: 120, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, marginLeft: 12 }}>
+        <div style={{ width: `${percent}%`, height: '100%', background: 'var(--accent)', borderRadius: 2, transition: 'width 0.3s' }} />
+      </div>
+    </div>
+  );
+
+  if (status === 'ready') return (
+    <div className="update-banner">
+      <span className="update-dot" style={{ background: 'var(--green)' }} />
+      <span>v{version} prête à installer</span>
+      <button className="btn btn-sm btn-primary" style={{ marginLeft: 8 }}
+        onClick={() => window.electronAPI.updaterInstall()}>
+        Redémarrer
+      </button>
+      <button className="btn btn-sm btn-ghost" style={{ marginLeft: 4 }} onClick={onDismiss}>
+        Plus tard
+      </button>
+    </div>
+  );
+
+  return null;
 }
 
 function App() {
@@ -27,7 +55,7 @@ function App() {
   const [msAccount, setMsAccount] = useState(null);
   const [skinUrl, setSkinUrl]     = useState(null);
   const [screen, setScreen]       = useState('home');
-  const [updateInfo, setUpdateInfo] = useState(null);
+  const [update, setUpdate] = useState(null);
   const [launchState, setLaunchState] = useState({ running: false, progress: 0, stage: '', logs: [] });
   const [showLaunch, setShowLaunch]   = useState(false);
   const [serverInfo, setServerInfo]   = useState({ online: false, players: 0, maxPlayers: 3000, latency: 0 });
@@ -60,13 +88,15 @@ function App() {
     });
   }, []);
 
-  // Check updates after config loaded
+  // Auto-updater events
   useEffect(() => {
-    if (!config) return;
-    window.electronAPI.checkUpdates().then(info => {
-      if (info.available) setUpdateInfo(info);
-    });
-  }, [config]);
+    window.electronAPI.on('updater-available', ({ version }) =>
+      setUpdate(u => u?.status === 'downloading' || u?.status === 'ready' ? u : { status: 'available', version, percent: 0 }));
+    window.electronAPI.on('updater-progress', ({ percent }) =>
+      setUpdate(u => u ? { ...u, status: 'downloading', percent } : u));
+    window.electronAPI.on('updater-ready', ({ version }) =>
+      setUpdate({ status: 'ready', version, percent: 100 }));
+  }, []);
 
   // Ping server on mount and every 30s
   useEffect(() => {
@@ -215,8 +245,8 @@ function App() {
 
   return (
     <>
-      {updateInfo && <UpdateBanner info={updateInfo} onDismiss={() => setUpdateInfo(null)} />}
-      <div className="app" style={{ marginTop: updateInfo ? 32 : 0 }}>
+      {update && <UpdateBanner update={update} onDismiss={() => setUpdate(null)} />}
+      <div className="app" style={{ marginTop: update ? 32 : 0 }}>
         <TopBar user={user} onNav={setScreen} />
         <Sidebar active={screen} onNav={setScreen} />
         <main className="main">{renderScreen()}</main>

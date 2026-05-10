@@ -3,6 +3,10 @@ directories:
   buildResources: build
 appId: fr.rebornmc.launcher
 productName: RebornMC Launcher
+publish:
+  provider: github
+  owner: LeVraiMattokDev
+  repo: RebornLauncher
 win:
   target: nsis
   icon: assets/logo.ico

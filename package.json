@@ -6,11 +6,17 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "publish": "electron-builder --publish always"
   },
   "build": {
     "appId": "fr.rebornmc.launcher",
     "productName": "RebornMC Launcher",
+    "publish": {
+      "provider": "github",
+      "owner": "LeVraiMattokDev",
+      "repo": "RebornLauncher"
+    },
     "win": {
       "target": "nsis",
       "icon": "assets/logo.ico"
@@ -30,6 +36,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.3.0",
     "minecraft-launcher-core": "^3.17.0"
   },
   "devDependencies": {
