@@ -11,14 +11,7 @@ function UpdateBanner({ update, onDismiss }) {
   if (status === 'available') return (
     <div className="update-banner">
       <span className="update-dot" />
-      <span>Mise à jour disponible : <b>v{version}</b></span>
-      <button className="btn btn-sm btn-primary" style={{ marginLeft: 8 }}
-        onClick={() => window.electronAPI.updaterDownload()}>
-        Télécharger
-      </button>
-      <button className="btn btn-sm btn-ghost" style={{ marginLeft: 4 }} onClick={onDismiss}>
-        Ignorer
-      </button>
+      <span>Mise à jour v{version} détectée — téléchargement en cours…</span>
     </div>
   );
 

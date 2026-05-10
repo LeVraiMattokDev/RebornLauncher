@@ -225,7 +225,7 @@ app.whenReady().then(() => {
   // ── Auto-updater ──────────────────────────────────────────────────────────
   if (app.isPackaged) {
     const { autoUpdater } = require('electron-updater');
-    autoUpdater.autoDownload = false;
+    autoUpdater.autoDownload = true;
 
     autoUpdater.on('update-available', info => {
       mainWindow?.webContents.send('updater-available', { version: info.version });
