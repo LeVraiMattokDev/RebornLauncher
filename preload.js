@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Server ping
   pingServer: () => ipcRenderer.invoke('ping-server'),
 
+  // Microsoft auth
+  msAuthStart:   ()             => ipcRenderer.invoke('ms-auth-start'),
+  msAuthRefresh: (refreshToken) => ipcRenderer.invoke('ms-auth-refresh', refreshToken),
+
   // Minecraft launch
   launchGame: (opts) => ipcRenderer.invoke('launch-game', opts),
 

@@ -13,7 +13,7 @@
     "productName": "RebornMC Launcher",
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "assets/logo.ico"
     },
     "files": [
       "main.js",

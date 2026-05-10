@@ -22,31 +22,40 @@ function UpdateBanner({ info, onDismiss }) {
 }
 
 function App() {
-  const [config, setConfig]         = useState(null);
-  const [authed, setAuthed]         = useState(false);
-  const [username, setUsername]     = useState('');
-  const [skinUrl, setSkinUrl]       = useState(null);
-  const [screen, setScreen]         = useState('home');
+  const [config, setConfig]       = useState(null);
+  const [authed, setAuthed]       = useState(false);
+  const [msAccount, setMsAccount] = useState(null);
+  const [skinUrl, setSkinUrl]     = useState(null);
+  const [screen, setScreen]       = useState('home');
   const [updateInfo, setUpdateInfo] = useState(null);
   const [launchState, setLaunchState] = useState({ running: false, progress: 0, stage: '', logs: [] });
-  const [showLaunch, setShowLaunch] = useState(false);
-  const [serverInfo, setServerInfo] = useState({ online: false, players: 0, maxPlayers: 3000, latency: 0 });
+  const [showLaunch, setShowLaunch]   = useState(false);
+  const [serverInfo, setServerInfo]   = useState({ online: false, players: 0, maxPlayers: 3000, latency: 0 });
 
-  // Boot: load config + migrate accounts
+  // Boot: load config, auto-refresh MS token if saved
   useEffect(() => {
-    window.electronAPI.getConfig().then(cfg => {
-      // Migration : si username existant mais pas dans accounts, l'ajouter
-      let accounts = cfg.accounts || [];
-      if (cfg.username && !accounts.includes(cfg.username)) {
-        accounts = [...accounts, cfg.username];
-        cfg = { ...cfg, accounts };
-        window.electronAPI.saveConfig(cfg);
-      }
+    window.electronAPI.getConfig().then(async cfg => {
       setConfig(cfg);
-      if (cfg.username) {
-        setUsername(cfg.username);
+      const saved = cfg.msAccount;
+      if (!saved) return;
+
+      const isExpired = !saved.expiresAt || Date.now() > saved.expiresAt - 60000;
+      if (isExpired) {
+        try {
+          const res = await window.electronAPI.msAuthRefresh(saved.refreshToken);
+          if (res.success) {
+            const newCfg = { ...cfg, msAccount: res.account };
+            setConfig(newCfg);
+            window.electronAPI.saveConfig(newCfg);
+            setMsAccount(res.account);
+            setAuthed(true);
+            window.electronAPI.getSkinUrl(res.account.name).then(setSkinUrl);
+          }
+        } catch (_) { /* token invalid — show auth screen */ }
+      } else {
+        setMsAccount(saved);
         setAuthed(true);
-        window.electronAPI.getSkinUrl(cfg.username).then(setSkinUrl);
+        window.electronAPI.getSkinUrl(saved.name).then(setSkinUrl);
       }
     });
   }, []);
@@ -74,7 +83,7 @@ function App() {
   // Subscribe to launch events
   useEffect(() => {
     window.electronAPI.on('launch-progress', (data) => {
-      const pct = data.total > 0 ? Math.round((data.task / data.total) * 100) : 0;
+      const pct   = data.total > 0 ? Math.round((data.task / data.total) * 100) : 0;
       const label = { assets: 'assets', client: 'client', natives: 'natives', download: 'téléchargement' };
       const stage = `Téléchargement ${label[data.type] || data.type}… ${pct}%`;
       setLaunchState(s => ({ ...s, progress: pct, stage,
@@ -110,41 +119,20 @@ function App() {
     return new Date().toLocaleTimeString('fr-FR', { hour12: false });
   }
 
-  function handleAuth(name) {
-    setUsername(name);
+  function handleAuth(account) {
+    setMsAccount(account);
     setAuthed(true);
-    window.electronAPI.getSkinUrl(name).then(setSkinUrl);
-    const accounts = (config.accounts || []);
-    const newAccounts = accounts.includes(name) ? accounts : [...accounts, name];
-    const newCfg = { ...config, username: name, accounts: newAccounts };
+    window.electronAPI.getSkinUrl(account.name).then(setSkinUrl);
+    const newCfg = { ...config, msAccount: account };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
   }
 
-  function handleSwitchAccount(name) {
-    setUsername(name);
-    window.electronAPI.getSkinUrl(name).then(setSkinUrl);
-    const newCfg = { ...config, username: name };
-    setConfig(newCfg);
-    window.electronAPI.saveConfig(newCfg);
-  }
-
-  function handleAddAccount(name) {
-    const accounts = config.accounts || [];
-    if (accounts.includes(name)) return;
-    const newCfg = { ...config, accounts: [...accounts, name] };
-    setConfig(newCfg);
-    window.electronAPI.saveConfig(newCfg);
-  }
-
-  function handleRemoveAccount(name) {
-    const accounts = (config.accounts || []).filter(a => a !== name);
-    let newCfg = { ...config, accounts };
-    if (name === username && accounts.length > 0) {
-      newCfg.username = accounts[0];
-      setUsername(accounts[0]);
-      window.electronAPI.getSkinUrl(accounts[0]).then(setSkinUrl);
-    }
+  function handleLogout() {
+    setMsAccount(null);
+    setAuthed(false);
+    setSkinUrl(null);
+    const newCfg = { ...config, msAccount: null };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
   }
@@ -153,13 +141,12 @@ function App() {
     setShowLaunch(true);
     setLaunchState({
       running: true, progress: 0, stage: 'Démarrage…',
-      logs: [{ ts: timestamp(), msg: `Connexion en tant que ${username}…`, ok: true }]
+      logs: [{ ts: timestamp(), msg: `Connexion en tant que ${msAccount?.name}…`, ok: true }]
     });
     window.electronAPI.launchGame({
-      username,
-      version:      config.minecraftVersion,
-      maxRam:       config.maxRam,
-      minRam:       config.minRam,
+      version: config.minecraftVersion,
+      maxRam:  config.maxRam,
+      minRam:  config.minRam,
     }).then(res => {
       if (!res.success) {
         setLaunchState(s => ({
@@ -172,7 +159,7 @@ function App() {
           logs: [...s.logs, {
             ts: timestamp(),
             msg: `Mods bannis supprimés : ${res.bannedMods.join(', ')}`,
-            ok: true
+            ok: true,
           }]
         }));
       }
@@ -186,19 +173,20 @@ function App() {
   }
 
   if (!config) return null;
-  if (!authed) return <AuthScreen onAuth={handleAuth} accounts={config.accounts || []} />;
+  if (!authed) return <AuthScreen onAuth={handleAuth} />;
 
+  const username = msAccount?.name || '';
   const user = { name: username, initials: username[0]?.toUpperCase() || '?', rank: 'JOUEUR' };
 
   const renderScreen = () => {
     switch (screen) {
-      case 'home':        return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} />;
-      case 'mods':        return <ModsScreen />;
-      case 'profiles':    return <ProfileScreen config={config} onSave={handleConfigSave} />;
-      case 'store':       return <StoreScreen />;
-      case 'account':     return <AccountScreen username={username} skinUrl={skinUrl} accounts={config.accounts || []} onSwitch={handleSwitchAccount} onAdd={handleAddAccount} onRemove={handleRemoveAccount} />;
-      case 'logs':        return <LogsScreen />;
-      default:            return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} />;
+      case 'home':     return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} />;
+      case 'mods':     return <ModsScreen />;
+      case 'profiles': return <ProfileScreen config={config} onSave={handleConfigSave} />;
+      case 'store':    return <StoreScreen />;
+      case 'account':  return <AccountScreen msAccount={msAccount} onLogout={handleLogout} />;
+      case 'logs':     return <LogsScreen />;
+      default:         return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} />;
     }
   };
 

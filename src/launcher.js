@@ -1,4 +1,4 @@
-const { Client, Authenticator } = require('minecraft-launcher-core');
+const { Client } = require('minecraft-launcher-core');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -143,17 +143,24 @@ async function ensureFabric(mcPath, mcVersion, onData) {
   return fabricId;
 }
 
-async function launchMinecraft({ username, mcPath, version, maxRam, minRam, githubRepo, onProgress, onData, onClose, onError }) {
+async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, minRam, githubRepo, onProgress, onData, onClose, onError }) {
   const client = new Client();
 
   ensureDir(mcPath);
   ensureDir(path.join(mcPath, 'mods'));
 
-  const auth = Authenticator.getAuth(username);
+  const auth = {
+    access_token: mcToken,
+    client_token: uuid,
+    uuid,
+    name,
+    user_properties: '{}',
+  };
 
   if (githubRepo) {
     await syncMods({ githubRepo, modsDir: path.join(mcPath, 'mods'), onData });
   }
+
 
   if (onData) onData({ type: 'debug', msg: 'Vérification Java…' });
   const javaPath = findJava();

@@ -63,6 +63,7 @@ function createWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 680,
+    icon: path.join(__dirname, 'assets', 'logo.ico'),
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#0B0E14',
@@ -134,25 +135,63 @@ app.whenReady().then(() => {
     } catch (_) { return []; }
   });
 
+  // ── Microsoft auth ────────────────────────────────────────────────────────
+  const { openAuthWindow, fullAuthFromCode, refreshAuth } = require('./src/msauth');
+
+  ipcMain.handle('ms-auth-start', async () => {
+    try {
+      const code    = await openAuthWindow(mainWindow);
+      const account = await fullAuthFromCode(code);
+      return { success: true, account };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('ms-auth-refresh', async (_e, refreshToken) => {
+    try {
+      const account = await refreshAuth(refreshToken);
+      return { success: true, account };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
   // ── Minecraft launch ──────────────────────────────────────────────────────
   const { launchMinecraft } = require('./src/launcher');
   const { applyModBan }     = require('./src/modban');
 
   ipcMain.handle('launch-game', async (event, opts) => {
     const cfg = configModule.load();
+    let msAccount = cfg.msAccount;
+
+    if (!msAccount) return { success: false, error: 'Compte Microsoft non connecté.' };
+
+    // Refresh token if expired or close to expiry
+    if (!msAccount.expiresAt || Date.now() > msAccount.expiresAt - 60000) {
+      try {
+        const res = await refreshAuth(msAccount.refreshToken);
+        msAccount = res;
+        configModule.save({ ...cfg, msAccount });
+      } catch (_) {
+        return { success: false, error: 'Session expirée. Reconnectez votre compte Microsoft.' };
+      }
+    }
+
     const modsFolder   = path.join(cfg.minecraftPath, 'mods');
     const modBanFolder = path.join(__dirname, 'mod_ban');
-
-    const banResult = applyModBan(modsFolder, modBanFolder);
+    const banResult    = applyModBan(modsFolder, modBanFolder);
 
     try {
       await launchMinecraft({
-        username:    opts.username,
-        mcPath:      cfg.minecraftPath,
-        version:     opts.version || cfg.minecraftVersion,
-        maxRam:      opts.maxRam  || cfg.maxRam,
-        minRam:      opts.minRam  || cfg.minRam,
-        githubRepo:  cfg.githubRepo,
+        mcToken:    msAccount.mcToken,
+        uuid:       msAccount.uuid,
+        name:       msAccount.name,
+        mcPath:     cfg.minecraftPath,
+        version:    opts.version || cfg.minecraftVersion,
+        maxRam:     opts.maxRam  || cfg.maxRam,
+        minRam:     opts.minRam  || cfg.minRam,
+        githubRepo: cfg.githubRepo,
         onProgress: data => event.sender.send('launch-progress', data),
         onData:     data => event.sender.send('launch-data', data),
         onClose:    code => event.sender.send('launch-close', code),

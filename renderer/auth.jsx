@@ -1,92 +1,74 @@
 /* global React */
 const { useState } = React;
 
-function AuthScreen({ onAuth, accounts = [] }) {
-  const [showForm, setShowForm] = useState(accounts.length === 0);
-  const [username, setUsername] = useState('');
-  const [error, setError]       = useState('');
+function AuthScreen({ onAuth }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
 
-  function validate(name) {
-    if (!name) return 'Entrez un pseudo.';
-    if (name.length < 3 || name.length > 16) return 'Pseudo : 3 à 16 caractères.';
-    if (!/^[a-zA-Z0-9_]+$/.test(name)) return 'Lettres, chiffres et _ uniquement.';
-    return '';
-  }
-
-  function handleSubmit() {
-    const name = username.trim();
-    const err = validate(name);
-    if (err) { setError(err); return; }
-    onAuth(name);
-  }
-
-  const Brand = () => (
-    <div className="auth-brand">
-      <div className="auth-logo"><img src="./assets/logo.png" style={{ width: 32, height: 32, objectFit: 'contain' }} /></div>
-      <h1 className="auth-title">REBORNMC</h1>
-      <p className="auth-version">Launcher v1.0.0</p>
-    </div>
-  );
-
-  if (!showForm) {
-    return (
-      <div className="auth-overlay">
-        <div className="auth-box">
-          <Brand />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 10, fontFamily: 'var(--pixel-font)', color: 'var(--text-faint)', marginBottom: 4 }}>
-              CHOISIR UN COMPTE
-            </div>
-            {accounts.map(acc => (
-              <button key={acc} className="auth-account-card" onClick={() => onAuth(acc)}>
-                <div className="auth-account-avatar">{acc[0]?.toUpperCase()}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{acc}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Mode hors-ligne</div>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)', flexShrink: 0 }}>
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-              </button>
-            ))}
-            <button className="btn" style={{ marginTop: 4, fontSize: 13 }} onClick={() => { setShowForm(true); setUsername(''); setError(''); }}>
-              + Nouveau compte
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  async function handleMicrosoftLogin() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await window.electronAPI.msAuthStart();
+      if (res.success) {
+        onAuth(res.account);
+      } else {
+        setError(res.error || 'Connexion échouée.');
+      }
+    } catch (e) {
+      setError(e.message || 'Erreur inattendue.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="auth-overlay">
       <div className="auth-box">
-        <Brand />
-        <div className="auth-form">
-          {accounts.length > 0 && (
-            <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowForm(false)}>
-              ← Retour
-            </button>
-          )}
-          <label className="auth-label">Pseudo de jeu</label>
-          <input
-            className="auth-input"
-            type="text"
-            value={username}
-            maxLength={16}
-            autoFocus
-            placeholder="VotreNom_"
-            onChange={e => { setUsername(e.target.value); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          />
-          {error && <div className="auth-error">{error}</div>}
-          <div className="auth-badge">
-            <span className="auth-badge-dot" />
-            Mode hors-ligne · Aucun compte Mojang requis
+        <div className="auth-brand">
+          <div className="auth-logo">
+            <img src="./assets/logo.png" style={{ width: 32, height: 32, objectFit: 'contain' }} />
           </div>
-          <button className="btn btn-primary auth-btn" onClick={handleSubmit}>
-            Jouer
+          <h1 className="auth-title">REBORNMC</h1>
+          <p className="auth-version">Launcher v1.0.0</p>
+        </div>
+
+        <div className="auth-form">
+          <div className="auth-badge" style={{ marginBottom: 16 }}>
+            <span className="auth-badge-dot" />
+            Connexion Microsoft requise · Minecraft Java Edition
+          </div>
+
+          {error && <div className="auth-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+          <button
+            className="btn btn-primary auth-btn"
+            onClick={handleMicrosoftLogin}
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+          >
+            {loading ? (
+              <>
+                <span className="auth-spinner" />
+                Connexion en cours…
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
+                  <rect x="1"  y="1"  width="9" height="9" fill="#F25022"/>
+                  <rect x="11" y="1"  width="9" height="9" fill="#7FBA00"/>
+                  <rect x="1"  y="11" width="9" height="9" fill="#00A4EF"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                </svg>
+                Se connecter avec Microsoft
+              </>
+            )}
           </button>
+
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', marginTop: 12, lineHeight: 1.6 }}>
+            Une fenêtre de connexion Microsoft s&apos;ouvrira.<br/>
+            Minecraft Java Edition requis sur ce compte.
+          </p>
         </div>
       </div>
     </div>

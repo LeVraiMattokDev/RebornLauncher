@@ -8,10 +8,9 @@ function getConfigPath() {
 
 function getDefaults() {
   return {
-    username: '',
-    accounts: [],
+    msAccount: null,
     storeUrl: 'https://rebornsmp.fr/shop',
-    githubRepo: 'PinStudios/RebornLauncher',
+    githubRepo: 'LeVraiMattokDev/RebornLauncher',
     minecraftPath: path.join(app.getPath('appData'), '.rebornmc'),
     minecraftVersion: '1.21.8',
     maxRam: '8',

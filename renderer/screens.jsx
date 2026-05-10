@@ -15,12 +15,12 @@ function HomeScreen({ onPlay, username, skinUrl, serverInfo = {} }) {
         <div className="hero-stage">
           <span className="hero-tag"><span className="pulse" /> V2 Out !</span>
           <div>
-            <h1 className="hero-headline">Joue à un serveur<span className="ember">UNIQUE.</span></h1>
+            <h1 className="hero-headline">Joue à un serveur<span className="ember"> UNIQUE.</span></h1>
             <p className="hero-desc">Rejoins RebornMC et vis une expérience Minecraft unique.{online ? ` ${players.toLocaleString('fr-FR')} joueurs connectés maintenant.` : ' Serveur hors-ligne.'}</p>
             <div className="hero-meta">
               {online
                 ? <span><b>{players.toLocaleString('fr-FR')}</b> en ligne</span>
-                : <span style={{ color: 'var(--red)' }}>Hors-ligne</span>}
+                : <span style={{ color: 'var(--red)' }}>Microsoft</span>}
               <span>play.rebornmc.fr</span>
             </div>
           </div>
@@ -47,7 +47,7 @@ function HomeScreen({ onPlay, username, skinUrl, serverInfo = {} }) {
       <div className="home-row">
         <div className="stats-card" style={{ flex: 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span className="card-title">Pulse Serveur</span>
+            <span className="card-title">Êtat du Serveur</span>
             <span className={`status-dot${online ? '' : ' err'}`} style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block' }} />
           </div>
           <div className="stat-row"><span className="stat-label">Joueurs en ligne</span><span className="stat-value" style={{ color: online ? 'var(--green)' : 'var(--red)' }}>{online ? players.toLocaleString('fr-FR') : '—'}</span></div>
@@ -188,81 +188,32 @@ function StoreScreen() {
 }
 
 /* ============ ACCOUNT ============ */
-function AccountScreen({ username, skinUrl, accounts, onSwitch, onAdd, onRemove }) {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser]         = useState('');
-  const [addError, setAddError]       = useState('');
-
-  function validate(name) {
-    if (!name) return 'Entrez un pseudo.';
-    if (name.length < 3 || name.length > 16) return 'Pseudo : 3 à 16 caractères.';
-    if (!/^[a-zA-Z0-9_]+$/.test(name)) return 'Lettres, chiffres et _ uniquement.';
-    if (accounts.includes(name)) return 'Ce compte existe déjà.';
-    return '';
-  }
-
-  function handleAdd() {
-    const name = newUser.trim();
-    const err = validate(name);
-    if (err) { setAddError(err); return; }
-    onAdd(name);
-    setNewUser(''); setAddError(''); setShowAddForm(false);
-  }
+function AccountScreen({ msAccount, onLogout }) {
+  const name = msAccount?.name || '';
+  const uuid = msAccount?.uuid || '';
 
   return (
     <div className="main-inner">
       <div className="page-header">
         <div>
           <div className="page-title">Profil</div>
-          <h1 className="page-h1">Comptes</h1>
-          <div className="page-sub">{accounts.length} compte{accounts.length !== 1 ? 's' : ''} enregistré{accounts.length !== 1 ? 's' : ''}.</div>
+          <h1 className="page-h1">Compte</h1>
+          <div className="page-sub">Connecté via Microsoft.</div>
         </div>
-        {!showAddForm && (
-          <button className="btn btn-primary" onClick={() => { setShowAddForm(true); setNewUser(''); setAddError(''); }}>
-            + Ajouter
-          </button>
-        )}
       </div>
 
-      {showAddForm && (
-        <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-          <div className="settings-group-title" style={{ marginBottom: 12 }}>Nouveau compte</div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: addError ? 8 : 0 }}>
-            <input
-              type="text"
-              value={newUser}
-              maxLength={16}
-              placeholder="VotreNom_"
-              autoFocus
-              onChange={e => { setNewUser(e.target.value); setAddError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            />
-            <button className="btn btn-primary" onClick={handleAdd}>Ajouter</button>
-            <button className="btn" onClick={() => setShowAddForm(false)}>Annuler</button>
-          </div>
-          {addError && <div style={{ fontSize: 12, color: 'var(--red)' }}>{addError}</div>}
-        </div>
-      )}
-
       <div className="account-list">
-        {accounts.map(acc => (
-          <div key={acc} className={`account-list-row${acc === username ? ' active' : ''}`}>
-            <div className="account-list-avatar">{acc[0]?.toUpperCase()}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{acc}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Mode hors-ligne · Saison 1</div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {acc === username
-                ? <span className="tag tag-green">ACTIF</span>
-                : <button className="btn btn-sm btn-primary" onClick={() => onSwitch(acc)}>Utiliser</button>
-              }
-              {accounts.length > 1 && (
-                <button className="btn-danger" onClick={() => onRemove(acc)}>Supprimer</button>
-              )}
-            </div>
+        <div className="account-list-row active">
+          <div className="account-list-avatar">{name[0]?.toUpperCase()}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Compte Microsoft · {uuid ? uuid.slice(0, 8) + '…' : ''}</div>
           </div>
-        ))}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="tag tag-green">ACTIF</span>
+            <button className="btn-danger" onClick={onLogout}>Déconnecter</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -290,7 +241,7 @@ function PlaceholderScreen({ title, subtitle }) {
 function LogsScreen() {
   const lines = [
     { ts: "12:14:08", lvl: "INFO", msg: "Launcher démarré · build 1.0.0 · java 21.0.4" },
-    { ts: "12:14:09", lvl: "INFO", msg: "Authentifié en mode hors-ligne" },
+    { ts: "12:14:09", lvl: "INFO", msg: "Authentifié via compte Microsoft" },
     { ts: "12:14:10", lvl: "INFO", msg: "Manifest récupéré : play.rebornsmp.net → r1" },
     { ts: "12:14:11", lvl: "INFO", msg: "Profil sélectionné : Reborn Survival (Forge 1.21.4)" },
     { ts: "12:14:12", lvl: "INFO", msg: "42 mods activés · 0 manquants · 1 mise à jour en attente" },
