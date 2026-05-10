@@ -81,6 +81,69 @@ async function syncMods({ githubRepo, modsDir, onData }) {
   msg(`Mods synchronisés (${remoteJars.length} mod${remoteJars.length !== 1 ? 's' : ''}).`);
 }
 
+// Collecte récursive de tous les fichiers d'un dossier GitHub
+async function listGitHubFilesRecursive(githubRepo, remotePath) {
+  const entries = await fetchJSON(`https://api.github.com/repos/${githubRepo}/contents/${remotePath}`);
+  if (!Array.isArray(entries)) return [];
+  const files = [];
+  for (const entry of entries) {
+    if (entry.type === 'file') {
+      files.push(entry);
+    } else if (entry.type === 'dir') {
+      const sub = await listGitHubFilesRecursive(githubRepo, entry.path);
+      files.push(...sub);
+    }
+  }
+  return files;
+}
+
+async function syncConfigs({ githubRepo, configDir, onData }) {
+  const msg = (m) => onData && onData({ type: 'debug', msg: m });
+
+  // Vérifier si le dossier config existe dans le dépôt
+  let rootEntries;
+  try {
+    rootEntries = await fetchJSON(`https://api.github.com/repos/${githubRepo}/contents/config`);
+  } catch (_) {
+    return; // Pas de dossier config dans le dépôt — ignorer silencieusement
+  }
+  if (!Array.isArray(rootEntries)) return;
+
+  const manifestPath = path.join(configDir, '.reborn-config-manifest.json');
+  let manifest = {};
+  try { if (fs.existsSync(manifestPath)) manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')); } catch (_) {}
+
+  msg('Vérification des configs depuis GitHub…');
+
+  let remoteFiles;
+  try {
+    remoteFiles = await listGitHubFilesRecursive(githubRepo, 'config');
+  } catch (e) {
+    msg(`Impossible de récupérer les configs : ${e.message}`);
+    return;
+  }
+
+  let count = 0;
+  for (const remote of remoteFiles) {
+    // remote.path est relatif à la racine du dépôt (ex: "config/sodium/options.json")
+    // On retire le préfixe "config/" pour obtenir le chemin local
+    const relPath = remote.path.replace(/^config\//, '');
+    const dest    = path.join(configDir, relPath);
+
+    if (fs.existsSync(dest) && manifest[relPath] === remote.sha) continue;
+
+    ensureDir(path.dirname(dest));
+    msg(`Config : ${relPath}…`);
+    await downloadFile(remote.download_url, dest);
+    manifest[relPath] = remote.sha;
+    count++;
+  }
+
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  if (count > 0) msg(`${count} fichier${count !== 1 ? 's' : ''} de config mis à jour.`);
+  else msg('Configs à jour.');
+}
+
 function ensureDir(p) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
@@ -148,6 +211,7 @@ async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, m
 
   ensureDir(mcPath);
   ensureDir(path.join(mcPath, 'mods'));
+  ensureDir(path.join(mcPath, 'config'));
 
   const auth = {
     access_token: mcToken,
@@ -159,6 +223,7 @@ async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, m
 
   if (githubRepo) {
     await syncMods({ githubRepo, modsDir: path.join(mcPath, 'mods'), onData });
+    await syncConfigs({ githubRepo, configDir: path.join(mcPath, 'config'), onData });
   }
 
 
