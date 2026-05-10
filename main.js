@@ -223,27 +223,35 @@ app.whenReady().then(() => {
   });
 
   // ── Auto-updater ──────────────────────────────────────────────────────────
+  let pendingInstallerPath = null;
+
+  ipcMain.on('updater-install', () => {
+    if (pendingInstallerPath) {
+      shell.openPath(pendingInstallerPath).then(() => app.quit());
+    }
+  });
+
   if (app.isPackaged) {
-    const { autoUpdater } = require('electron-updater');
-    autoUpdater.autoDownload = true;
+    const { checkForUpdates, downloadUpdate } = require('./src/updater');
 
-    autoUpdater.on('update-available', info => {
-      mainWindow?.webContents.send('updater-available', { version: info.version });
-    });
-    autoUpdater.on('download-progress', progress => {
-      mainWindow?.webContents.send('updater-progress', { percent: Math.round(progress.percent) });
-    });
-    autoUpdater.on('update-downloaded', info => {
-      mainWindow?.webContents.send('updater-ready', { version: info.version });
-    });
-    autoUpdater.on('error', err => {
-      console.error('[updater]', err.message);
-    });
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const info = await checkForUpdates(app.getVersion());
+        if (!info.available) return;
 
-    ipcMain.handle('updater-download', () => autoUpdater.downloadUpdate());
-    ipcMain.on('updater-install', () => autoUpdater.quitAndInstall(false, true));
+        mainWindow?.webContents.send('updater-available', { version: info.version });
 
-    autoUpdater.checkForUpdates().catch(err => console.error('[updater check]', err.message));
+        const dest = path.join(app.getPath('temp'), info.assetName);
+        await downloadUpdate(info.installerUrl, dest, percent => {
+          mainWindow?.webContents.send('updater-progress', { percent });
+        });
+
+        pendingInstallerPath = dest;
+        mainWindow?.webContents.send('updater-ready', { version: info.version });
+      } catch (e) {
+        console.error('[updater]', e.message);
+      }
+    });
   }
 
   app.on('activate', () => {

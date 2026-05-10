@@ -10,7 +10,10 @@
       "Bash(node -e \"require\\('./src/config'\\)\")",
       "Bash(node:*)",
       "Bash(npm show:*)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(mkdir -p /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor)",
+      "Bash(cp /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/node_modules/react/umd/react.development.js /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor/)",
+      "Bash(cp /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/node_modules/react-dom/umd/react-dom.development.js /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor/)"
     ]
   },
   "disabledMcpjsonServers": [

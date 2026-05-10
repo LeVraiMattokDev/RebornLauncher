@@ -1,6 +1,6 @@
 {
   "name": "reborn-launcher",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "RebornMC Minecraft Launcher",
   "main": "main.js",
   "scripts": {
@@ -37,11 +37,14 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.3.0",
     "minecraft-launcher-core": "^3.17.0"
   },
   "devDependencies": {
+    "@babel/standalone": "^7.29.0",
     "electron": "^31.0.0",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "skinview3d": "^2.2.0"
   }
 }
