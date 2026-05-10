@@ -1,0 +1,21 @@
+directories:
+  output: dist
+  buildResources: build
+appId: fr.rebornmc.launcher
+productName: RebornMC Launcher
+win:
+  target: nsis
+  icon: assets/icon.ico
+files:
+  - filter:
+      - main.js
+      - preload.js
+      - renderer/**
+      - src/**
+      - mod_ban/**
+      - assets/**
+      - node_modules/**
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+electronVersion: 31.7.7
