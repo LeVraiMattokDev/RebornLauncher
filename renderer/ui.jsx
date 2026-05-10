@@ -101,7 +101,7 @@ function TopBar({ user, onNav }) {
         <div className="brand-mark"><img src="./assets/logo.png" style={{ width: 22, height: 22, objectFit: 'contain' }} /></div>
         <div className="brand-text">
           <div className="brand-name">REBORNMC</div>
-          <div className="brand-sub">Launcher v1.0.0</div>
+          <div className="brand-sub">Launcher v1.0.2</div>
         </div>
       </div>
       <div className="topbar-spacer" />

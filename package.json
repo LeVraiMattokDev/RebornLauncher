@@ -1,6 +1,6 @@
 {
   "name": "reborn-launcher",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "RebornMC Minecraft Launcher",
   "main": "main.js",
   "scripts": {
@@ -15,7 +15,8 @@
     "publish": {
       "provider": "github",
       "owner": "LeVraiMattokDev",
-      "repo": "RebornLauncher"
+      "repo": "RebornLauncher",
+      "releaseType": "release"
     },
     "win": {
       "target": "nsis",

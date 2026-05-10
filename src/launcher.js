@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.0' } }, res => {
+    https.get(url, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.2' } }, res => {
       if (res.statusCode === 301 || res.statusCode === 302) {
         res.resume();
         return fetchJSON(res.headers.location).then(resolve).catch(reject);
@@ -29,7 +29,7 @@ function fetchJSON(url) {
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     function attempt(u) {
-      https.get(u, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.0' } }, res => {
+      https.get(u, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.2' } }, res => {
         if (res.statusCode === 301 || res.statusCode === 302) {
           res.resume();
           return attempt(res.headers.location);

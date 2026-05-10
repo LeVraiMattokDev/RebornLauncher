@@ -7,6 +7,7 @@ publish:
   provider: github
   owner: LeVraiMattokDev
   repo: RebornLauncher
+  releaseType: release
 win:
   target: nsis
   icon: assets/logo.ico
