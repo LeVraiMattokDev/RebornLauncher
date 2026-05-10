@@ -5,7 +5,7 @@ appId: fr.rebornmc.launcher
 productName: RebornMC Launcher
 win:
   target: nsis
-  icon: assets/icon.ico
+  icon: assets/logo.ico
 files:
   - filter:
       - main.js
