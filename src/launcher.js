@@ -117,17 +117,16 @@ async function listGitHubFilesRecursive(githubRepo, remotePath) {
   return files;
 }
 
-async function syncConfigs({ githubRepo, configDir, onData }) {
+async function syncConfigs({ githubRepo, configDir, remoteConfigPath = 'config', onData }) {
   const msg = (m) => onData && onData({ type: 'debug', msg: m });
 
   // Vérifier si le dossier config existe dans le dépôt
-  let rootEntries;
   try {
-    rootEntries = await fetchJSON(`https://api.github.com/repos/${githubRepo}/contents/config`);
+    const check = await fetchJSON(`https://api.github.com/repos/${githubRepo}/contents/${remoteConfigPath}`);
+    if (!Array.isArray(check)) return;
   } catch (_) {
     return; // Pas de dossier config dans le dépôt — ignorer silencieusement
   }
-  if (!Array.isArray(rootEntries)) return;
 
   const manifestPath = path.join(configDir, '.reborn-config-manifest.json');
   let manifest = {};
@@ -137,17 +136,20 @@ async function syncConfigs({ githubRepo, configDir, onData }) {
 
   let remoteFiles;
   try {
-    remoteFiles = await listGitHubFilesRecursive(githubRepo, 'config');
+    remoteFiles = await listGitHubFilesRecursive(githubRepo, remoteConfigPath);
   } catch (e) {
     msg(`Impossible de récupérer les configs : ${e.message}`);
     return;
   }
 
+  // Préfixe à retirer pour obtenir le chemin local (ex: "mods/config/fancymenu/x" → "fancymenu/x")
+  const prefix = remoteConfigPath.endsWith('/') ? remoteConfigPath : remoteConfigPath + '/';
+
   let count = 0;
   for (const remote of remoteFiles) {
-    // remote.path est relatif à la racine du dépôt (ex: "config/sodium/options.json")
-    // On retire le préfixe "config/" pour obtenir le chemin local
-    const relPath = remote.path.replace(/^config\//, '');
+    const relPath = remote.path.startsWith(prefix)
+      ? remote.path.slice(prefix.length)
+      : remote.path;
     const dest    = path.join(configDir, relPath);
 
     if (fs.existsSync(dest) && manifest[relPath] === remote.sha) continue;

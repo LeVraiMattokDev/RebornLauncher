@@ -179,7 +179,7 @@ app.whenReady().then(() => {
 
     try {
       await syncMods({ githubRepo: cfg.githubRepo, modsDir, onData: send });
-      await syncConfigs({ githubRepo: cfg.githubRepo, configDir, onData: send });
+      await syncConfigs({ githubRepo: cfg.githubRepo, configDir, remoteConfigPath: 'mods/config', onData: send });
       return { success: true };
     } catch (e) {
       console.error('[sync-files] erreur:', e.message);
