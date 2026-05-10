@@ -157,10 +157,37 @@ app.whenReady().then(() => {
     }
   });
 
-  // ── Minecraft launch ──────────────────────────────────────────────────────
-  const { launchMinecraft } = require('./src/launcher');
-  const { applyModBan }     = require('./src/modban');
+  // ── Sync mods + configs ───────────────────────────────────────────────────
+  const { launchMinecraft, syncMods, syncConfigs } = require('./src/launcher');
+  const { applyModBan }                            = require('./src/modban');
 
+  ipcMain.handle('sync-files', async (event) => {
+    const cfg = configModule.load();
+    console.log('[sync-files] githubRepo =', cfg.githubRepo);
+    if (!cfg.githubRepo) return { success: true };
+
+    const mcPath    = cfg.minecraftPath;
+    const modsDir   = path.join(mcPath, 'mods');
+    const configDir = path.join(mcPath, 'config');
+    const send      = d => {
+      console.log('[sync-files] event:', d.msg);
+      event.sender.send('launch-data', d);
+    };
+
+    if (!fs.existsSync(modsDir))   fs.mkdirSync(modsDir,   { recursive: true });
+    if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+
+    try {
+      await syncMods({ githubRepo: cfg.githubRepo, modsDir, onData: send });
+      await syncConfigs({ githubRepo: cfg.githubRepo, configDir, onData: send });
+      return { success: true };
+    } catch (e) {
+      console.error('[sync-files] erreur:', e.message);
+      return { success: false, error: e.message };
+    }
+  });
+
+  // ── Minecraft launch ──────────────────────────────────────────────────────
   ipcMain.handle('launch-game', async (event, opts) => {
     const cfg = configModule.load();
     let msAccount = cfg.msAccount;
@@ -191,7 +218,6 @@ app.whenReady().then(() => {
         version:    opts.version || cfg.minecraftVersion,
         maxRam:     opts.maxRam  || cfg.maxRam,
         minRam:     opts.minRam  || cfg.minRam,
-        githubRepo: cfg.githubRepo,
         onProgress: data => event.sender.send('launch-progress', data),
         onData:     data => event.sender.send('launch-data', data),
         onClose:    code => event.sender.send('launch-close', code),

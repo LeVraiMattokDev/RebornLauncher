@@ -137,17 +137,39 @@ function App() {
     window.electronAPI.saveConfig(newCfg);
   }
 
-  function handlePlay() {
-    setShowLaunch(true);
-    setLaunchState({
-      running: true, progress: 0, stage: 'Démarrage…',
-      logs: [{ ts: timestamp(), msg: `Connexion en tant que ${msAccount?.name}…`, ok: true }]
+  async function handlePlay() {
+    // flushSync garantit le rendu de l'overlay AVANT tout await
+    ReactDOM.flushSync(() => {
+      setShowLaunch(true);
+      setLaunchState({
+        running: true, progress: 0, stage: 'Vérification des mods…',
+        logs: [{ ts: timestamp(), msg: 'Synchronisation des mods et configs…', ok: true }]
+      });
     });
-    window.electronAPI.launchGame({
-      version: config.minecraftVersion,
-      maxRam:  config.maxRam,
-      minRam:  config.minRam,
-    }).then(res => {
+
+    try {
+      // Phase 1 : sync mods + configs
+      const syncRes = await window.electronAPI.syncFiles();
+      if (!syncRes.success) {
+        setLaunchState(s => ({
+          ...s, running: false, stage: `Erreur sync : ${syncRes.error}`,
+          logs: [...s.logs, { ts: timestamp(), msg: `ERREUR sync : ${syncRes.error}`, ok: false }]
+        }));
+        return;
+      }
+
+      // Phase 2 : lancement
+      setLaunchState(s => ({
+        ...s, stage: 'Démarrage du jeu…',
+        logs: [...s.logs, { ts: timestamp(), msg: `Lancement en tant que ${msAccount?.name}…`, ok: true }]
+      }));
+
+      const res = await window.electronAPI.launchGame({
+        version: config.minecraftVersion,
+        maxRam:  config.maxRam,
+        minRam:  config.minRam,
+      });
+
       if (!res.success) {
         setLaunchState(s => ({
           ...s, running: false, stage: `Erreur : ${res.error}`,
@@ -156,14 +178,15 @@ function App() {
       } else if (res.bannedMods && res.bannedMods.length > 0) {
         setLaunchState(s => ({
           ...s,
-          logs: [...s.logs, {
-            ts: timestamp(),
-            msg: `Mods bannis supprimés : ${res.bannedMods.join(', ')}`,
-            ok: true,
-          }]
+          logs: [...s.logs, { ts: timestamp(), msg: `Mods bannis supprimés : ${res.bannedMods.join(', ')}`, ok: true }]
         }));
       }
-    });
+    } catch (e) {
+      setLaunchState(s => ({
+        ...s, running: false, stage: `Erreur : ${e.message}`,
+        logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${e.message}`, ok: false }]
+      }));
+    }
   }
 
   function handleConfigSave(updates) {

@@ -18,11 +18,17 @@ function getDefaults() {
   };
 }
 
+const FIXED = {
+  githubRepo: 'LeVraiMattokDev/RebornLauncher',
+  minecraftVersion: '1.21.8',
+};
+
 function load() {
   try {
     const p = getConfigPath();
     if (fs.existsSync(p)) {
-      return { ...getDefaults(), ...JSON.parse(fs.readFileSync(p, 'utf-8')) };
+      const saved = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      return { ...getDefaults(), ...saved, ...FIXED };
     }
   } catch (_) {}
   return getDefaults();

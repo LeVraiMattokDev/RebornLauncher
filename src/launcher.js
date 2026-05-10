@@ -8,13 +8,19 @@ function fetchJSON(url) {
   return new Promise((resolve, reject) => {
     https.get(url, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.0' } }, res => {
       if (res.statusCode === 301 || res.statusCode === 302) {
+        res.resume();
         return fetchJSON(res.headers.location).then(resolve).catch(reject);
       }
       let data = '';
       res.on('data', c => { data += c; });
       res.on('end', () => {
+        if (res.statusCode !== 200) {
+          let msg = `HTTP ${res.statusCode}`;
+          try { const j = JSON.parse(data); if (j.message) msg += ` : ${j.message}`; } catch (_) {}
+          return reject(new Error(msg));
+        }
         try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON parse failed: ${data.substring(0, 60)}`)); }
+        catch (e) { reject(new Error(`JSON invalide : ${data.substring(0, 60)}`)); }
       });
     }).on('error', reject);
   });
@@ -22,16 +28,23 @@ function fetchJSON(url) {
 
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    const get = (u) => https.get(u, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.0' } }, res => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        file.close();
-        return get(res.headers.location);
-      }
-      res.pipe(file);
-      file.on('finish', () => file.close(resolve));
-    }).on('error', err => { fs.unlink(dest, () => {}); reject(err); });
-    get(url);
+    function attempt(u) {
+      https.get(u, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.0' } }, res => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          res.resume();
+          return attempt(res.headers.location);
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`HTTP ${res.statusCode} pour ${u}`));
+        }
+        const file = fs.createWriteStream(dest);
+        res.pipe(file);
+        file.on('finish', () => file.close(resolve));
+        file.on('error', err => { fs.unlink(dest, () => {}); reject(err); });
+      }).on('error', err => { fs.unlink(dest, () => {}); reject(err); });
+    }
+    attempt(url);
   });
 }
 
@@ -62,7 +75,14 @@ async function syncMods({ githubRepo, modsDir, onData }) {
     const dest = path.join(modsDir, remote.name);
     if (fs.existsSync(dest) && manifest[remote.name] === remote.sha) continue;
     msg(`Téléchargement : ${remote.name}…`);
-    await downloadFile(remote.download_url, dest);
+    // media.githubusercontent.com gère LFS et fichiers normaux
+    const dlUrl = `https://media.githubusercontent.com/media/${githubRepo}/HEAD/${remote.path}`;
+    try {
+      await downloadFile(dlUrl, dest);
+    } catch (_) {
+      // Fallback sur download_url standard
+      await downloadFile(remote.download_url, dest);
+    }
     manifest[remote.name] = remote.sha;
     msg(`${remote.name} installé.`);
   }
@@ -134,7 +154,12 @@ async function syncConfigs({ githubRepo, configDir, onData }) {
 
     ensureDir(path.dirname(dest));
     msg(`Config : ${relPath}…`);
-    await downloadFile(remote.download_url, dest);
+    const dlUrl = `https://media.githubusercontent.com/media/${githubRepo}/HEAD/${remote.path}`;
+    try {
+      await downloadFile(dlUrl, dest);
+    } catch (_) {
+      await downloadFile(remote.download_url, dest);
+    }
     manifest[relPath] = remote.sha;
     count++;
   }
@@ -206,7 +231,7 @@ async function ensureFabric(mcPath, mcVersion, onData) {
   return fabricId;
 }
 
-async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, minRam, githubRepo, onProgress, onData, onClose, onError }) {
+async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, minRam, onProgress, onData, onClose, onError }) {
   const client = new Client();
 
   ensureDir(mcPath);
@@ -220,12 +245,6 @@ async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, m
     name,
     user_properties: '{}',
   };
-
-  if (githubRepo) {
-    await syncMods({ githubRepo, modsDir: path.join(mcPath, 'mods'), onData });
-    await syncConfigs({ githubRepo, configDir: path.join(mcPath, 'config'), onData });
-  }
-
 
   if (onData) onData({ type: 'debug', msg: 'Vérification Java…' });
   const javaPath = findJava();
@@ -261,4 +280,4 @@ async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, m
   return client;
 }
 
-module.exports = { launchMinecraft };
+module.exports = { launchMinecraft, syncMods, syncConfigs };

@@ -9,7 +9,8 @@
       "Bash(node_modules/.bin/electron --version)",
       "Bash(node -e \"require\\('./src/config'\\)\")",
       "Bash(node:*)",
-      "Bash(npm show:*)"
+      "Bash(npm show:*)",
+      "WebFetch(domain:api.github.com)"
     ]
   },
   "disabledMcpjsonServers": [

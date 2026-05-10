@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   msAuthStart:   ()             => ipcRenderer.invoke('ms-auth-start'),
   msAuthRefresh: (refreshToken) => ipcRenderer.invoke('ms-auth-refresh', refreshToken),
 
+  // Sync mods + configs
+  syncFiles: () => ipcRenderer.invoke('sync-files'),
+
   // Minecraft launch
   launchGame: (opts) => ipcRenderer.invoke('launch-game', opts),
 
