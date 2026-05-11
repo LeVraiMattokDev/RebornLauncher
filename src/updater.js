@@ -1,24 +1,6 @@
-const https = require('https');
-const fs    = require('fs');
+const { fetchJSON, downloadFile } = require('./http');
 
 const GITHUB_REPO = 'LeVraiMattokDev/RebornLauncher';
-
-function fetchJSON(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.3' } }, res => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        res.resume();
-        return fetchJSON(res.headers.location).then(resolve).catch(reject);
-      }
-      let data = '';
-      res.on('data', c => { data += c; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (_) { reject(new Error(`JSON invalide : ${data.slice(0, 60)}`)); }
-      });
-    }).on('error', reject);
-  });
-}
 
 async function checkForUpdates(currentVersion) {
   try {
@@ -41,33 +23,7 @@ async function checkForUpdates(currentVersion) {
 }
 
 function downloadUpdate(url, dest, onProgress) {
-  return new Promise((resolve, reject) => {
-    function attempt(u) {
-      https.get(u, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.3' } }, res => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          res.resume();
-          return attempt(res.headers.location);
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          return reject(new Error(`HTTP ${res.statusCode}`));
-        }
-        const total      = parseInt(res.headers['content-length'] || '0', 10);
-        let downloaded   = 0;
-        const file       = fs.createWriteStream(dest);
-
-        res.on('data', chunk => {
-          downloaded += chunk.length;
-          file.write(chunk);
-          if (total > 0 && onProgress) onProgress(Math.round((downloaded / total) * 100));
-        });
-        res.on('end',   () => file.end(resolve));
-        res.on('error', err => { fs.unlink(dest, () => {}); reject(err); });
-        file.on('error', err => { fs.unlink(dest, () => {}); reject(err); });
-      }).on('error', reject);
-    }
-    attempt(url);
-  });
+  return downloadFile(url, dest, onProgress);
 }
 
 async function getSkinUrl(username) {

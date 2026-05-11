@@ -9,12 +9,15 @@ function getConfigPath() {
 function getDefaults() {
   return {
     msAccount: null,
+    savedAccounts: [],
     storeUrl: 'https://rebornsmp.fr/shop',
     githubRepo: 'LeVraiMattokDev/RebornLauncher',
     minecraftPath: path.join(app.getPath('appData'), '.rebornmc'),
     minecraftVersion: '1.21.8',
     maxRam: '8',
     minRam: '2',
+    closeLauncherOnStart: false,
+    jvmArgs: '',
   };
 }
 
@@ -42,4 +45,4 @@ function save(config) {
   }
 }
 
-module.exports = { load, save };
+module.exports = { load, save, getDefaults };

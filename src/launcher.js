@@ -1,60 +1,20 @@
 const { Client } = require('minecraft-launcher-core');
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
 const { execSync } = require('child_process');
+const { fetchJSON, downloadFile } = require('./http');
 
-function fetchJSON(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.3' } }, res => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        res.resume();
-        return fetchJSON(res.headers.location).then(resolve).catch(reject);
-      }
-      let data = '';
-      res.on('data', c => { data += c; });
-      res.on('end', () => {
-        if (res.statusCode !== 200) {
-          let msg = `HTTP ${res.statusCode}`;
-          try { const j = JSON.parse(data); if (j.message) msg += ` : ${j.message}`; } catch (_) {}
-          return reject(new Error(msg));
-        }
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON invalide : ${data.substring(0, 60)}`)); }
-      });
-    }).on('error', reject);
-  });
+function ensureDir(p) {
+  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    function attempt(u) {
-      https.get(u, { headers: { 'User-Agent': 'RebornMC-Launcher/1.0.3' } }, res => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          res.resume();
-          return attempt(res.headers.location);
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          return reject(new Error(`HTTP ${res.statusCode} pour ${u}`));
-        }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on('finish', () => file.close(resolve));
-        file.on('error', err => { fs.unlink(dest, () => {}); reject(err); });
-      }).on('error', err => { fs.unlink(dest, () => {}); reject(err); });
-    }
-    attempt(url);
-  });
-}
-
-async function syncMods({ githubRepo, modsDir, onData }) {
+async function syncMods({ githubRepo, modsDir, onData, onProgress }) {
   const msg = (m) => onData && onData({ type: 'debug', msg: m });
   const manifestPath = path.join(modsDir, '.reborn-manifest.json');
   let manifest = {};
   try { if (fs.existsSync(manifestPath)) manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')); } catch (_) {}
 
-  if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+  ensureDir(modsDir);
 
   msg('Vérification des mods depuis GitHub…');
   let remoteFiles;
@@ -70,20 +30,28 @@ async function syncMods({ githubRepo, modsDir, onData }) {
   const remoteJars = remoteFiles.filter(f => f.type === 'file' && f.name.endsWith('.jar'));
   const remoteNames = new Set(remoteJars.map(f => f.name));
 
-  // Télécharger mods manquants ou modifiés
-  for (const remote of remoteJars) {
+  let downloaded = 0;
+  for (let i = 0; i < remoteJars.length; i++) {
+    const remote = remoteJars[i];
     const dest = path.join(modsDir, remote.name);
-    if (fs.existsSync(dest) && manifest[remote.name] === remote.sha) continue;
-    msg(`Téléchargement : ${remote.name}…`);
-    // media.githubusercontent.com gère LFS et fichiers normaux
+
+    if (onProgress) onProgress({ current: i + 1, total: remoteJars.length, name: remote.name });
+
+    // Skip if SHA matches and file exists locally
+    if (manifest[remote.name] === remote.sha && fs.existsSync(dest)) {
+      msg(`${remote.name} à jour.`);
+      continue;
+    }
+
+    msg(`Sync : ${remote.name}…`);
     const dlUrl = `https://media.githubusercontent.com/media/${githubRepo}/HEAD/${remote.path}`;
     try {
       await downloadFile(dlUrl, dest);
     } catch (_) {
-      // Fallback sur download_url standard
       await downloadFile(remote.download_url, dest);
     }
     manifest[remote.name] = remote.sha;
+    downloaded++;
     msg(`${remote.name} installé.`);
   }
 
@@ -98,10 +66,9 @@ async function syncMods({ githubRepo, modsDir, onData }) {
   }
 
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-  msg(`Mods synchronisés (${remoteJars.length} mod${remoteJars.length !== 1 ? 's' : ''}).`);
+  msg(`Mods synchronisés (${downloaded} téléchargé${downloaded !== 1 ? 's' : ''}, ${remoteJars.length} total).`);
 }
 
-// Collecte récursive de tous les fichiers d'un dossier GitHub
 async function listGitHubFilesRecursive(githubRepo, remotePath) {
   const entries = await fetchJSON(`https://api.github.com/repos/${githubRepo}/contents/${remotePath}`);
   if (!Array.isArray(entries)) return [];
@@ -120,12 +87,11 @@ async function listGitHubFilesRecursive(githubRepo, remotePath) {
 async function syncConfigs({ githubRepo, configDir, remoteConfigPath = 'config', onData }) {
   const msg = (m) => onData && onData({ type: 'debug', msg: m });
 
-  // Vérifier si le dossier config existe dans le dépôt
   try {
     const check = await fetchJSON(`https://api.github.com/repos/${githubRepo}/contents/${remoteConfigPath}`);
     if (!Array.isArray(check)) return;
   } catch (_) {
-    return; // Pas de dossier config dans le dépôt — ignorer silencieusement
+    return;
   }
 
   const manifestPath = path.join(configDir, '.reborn-config-manifest.json');
@@ -142,7 +108,6 @@ async function syncConfigs({ githubRepo, configDir, remoteConfigPath = 'config',
     return;
   }
 
-  // Préfixe à retirer pour obtenir le chemin local (ex: "mods/config/fancymenu/x" → "fancymenu/x")
   const prefix = remoteConfigPath.endsWith('/') ? remoteConfigPath : remoteConfigPath + '/';
 
   let count = 0;
@@ -150,12 +115,13 @@ async function syncConfigs({ githubRepo, configDir, remoteConfigPath = 'config',
     const relPath = remote.path.startsWith(prefix)
       ? remote.path.slice(prefix.length)
       : remote.path;
-    const dest    = path.join(configDir, relPath);
+    const dest = path.join(configDir, relPath);
 
-    if (fs.existsSync(dest) && manifest[relPath] === remote.sha) continue;
+    // Skip if SHA matches and file exists
+    if (manifest[relPath] === remote.sha && fs.existsSync(dest)) continue;
 
     ensureDir(path.dirname(dest));
-    msg(`Config : ${relPath}…`);
+    msg(`Sync config : ${relPath}…`);
     const dlUrl = `https://media.githubusercontent.com/media/${githubRepo}/HEAD/${remote.path}`;
     try {
       await downloadFile(dlUrl, dest);
@@ -171,25 +137,18 @@ async function syncConfigs({ githubRepo, configDir, remoteConfigPath = 'config',
   else msg('Configs à jour.');
 }
 
-function ensureDir(p) {
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-}
-
 function findJava() {
-  // Essai via PATH
   try {
     execSync('java -version', { stdio: 'ignore' });
-    return null; // null = utiliser java du PATH
+    return null;
   } catch (_) {}
 
-  // Essai JAVA_HOME
   if (process.env.JAVA_HOME) {
     const bin = path.join(process.env.JAVA_HOME, 'bin',
       process.platform === 'win32' ? 'java.exe' : 'java');
     if (fs.existsSync(bin)) return bin;
   }
 
-  // Chemins courants Windows
   if (process.platform === 'win32') {
     const bases = [
       path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Java'),
@@ -233,7 +192,7 @@ async function ensureFabric(mcPath, mcVersion, onData) {
   return fabricId;
 }
 
-async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, minRam, onProgress, onData, onClose, onError }) {
+async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, minRam, jvmArgs, onProgress, onData, onClose, onError }) {
   const client = new Client();
 
   ensureDir(mcPath);
@@ -269,6 +228,9 @@ async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, m
   };
 
   if (javaPath) opts.javaPath = javaPath;
+  if (jvmArgs) {
+    opts.customArgs = jvmArgs.split(/\s+/).filter(Boolean);
+  }
 
   client.on('progress', data => onProgress && onProgress(data));
   client.on('download-status', data => onData && onData({ type: 'download', ...data }));

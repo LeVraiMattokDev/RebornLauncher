@@ -1,9 +1,9 @@
 /* global React, ReactDOM,
-   TopBar, Sidebar, StatusBar, AuthScreen,
-   HomeScreen, ModsScreen, ProfileScreen, StoreScreen,
+   TopBar, Sidebar, StatusBar, AuthScreen, SplashScreen, ToastContainer,
+   HomeScreen, ModsScreen, ProfileScreen, StoreScreen, SettingsScreen,
    AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay */
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 function UpdateBanner({ update, onDismiss }) {
   const { status, version, percent } = update;
@@ -30,12 +30,8 @@ function UpdateBanner({ update, onDismiss }) {
       <span className="update-dot" style={{ background: 'var(--green)' }} />
       <span>v{version} prête à installer</span>
       <button className="btn btn-sm btn-primary" style={{ marginLeft: 8 }}
-        onClick={() => window.electronAPI.updaterInstall()}>
-        Redémarrer
-      </button>
-      <button className="btn btn-sm btn-ghost" style={{ marginLeft: 4 }} onClick={onDismiss}>
-        Plus tard
-      </button>
+        onClick={() => window.electronAPI.updaterInstall()}>Redémarrer</button>
+      <button className="btn btn-sm btn-ghost" style={{ marginLeft: 4 }} onClick={onDismiss}>Plus tard</button>
     </div>
   );
 
@@ -43,105 +39,198 @@ function UpdateBanner({ update, onDismiss }) {
 }
 
 function App() {
-  const [config, setConfig]       = useState(null);
-  const [authed, setAuthed]       = useState(false);
-  const [msAccount, setMsAccount] = useState(null);
-  const [skinUrl, setSkinUrl]     = useState(null);
-  const [screen, setScreen]       = useState('home');
-  const [update, setUpdate] = useState(null);
-  const [launchState, setLaunchState] = useState({ running: false, progress: 0, stage: '', logs: [] });
-  const [showLaunch, setShowLaunch]   = useState(false);
-  const [serverInfo, setServerInfo]   = useState({ online: false, players: 0, maxPlayers: 3000, latency: 0 });
+  const [config, setConfig]             = useState(null);
+  const [appVersion, setAppVersion]     = useState('');
+  const [authed, setAuthed]             = useState(false);
+  const [msAccount, setMsAccount]       = useState(null);
+  const [skinUrl, setSkinUrl]           = useState(null);
+  const [screen, setScreen]             = useState('home');
+  const [update, setUpdate]             = useState(null);
+  const [launchState, setLaunchState]   = useState({ running: false, progress: 0, stage: '', logs: [] });
+  const [showLaunch, setShowLaunch]     = useState(false);
+  const [serverInfo, setServerInfo]     = useState({ online: false, players: 0, maxPlayers: 3000, latency: 0 });
+  const [toasts, setToasts]             = useState([]);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashStatus, setSplashStatus] = useState('Chargement…');
+  const [globalLogs, setGlobalLogs]     = useState([]);
+  const [systemInfo, setSystemInfo]     = useState(null);
 
-  // Boot: load config, auto-refresh MS token if saved
-  useEffect(() => {
-    window.electronAPI.getConfig().then(async cfg => {
-      setConfig(cfg);
-      const saved = cfg.msAccount;
-      if (!saved) return;
+  const toastIdRef = useRef(0);
+  const handlePlayRef = useRef(null);
 
-      const isExpired = !saved.expiresAt || Date.now() > saved.expiresAt - 60000;
-      if (isExpired) {
-        try {
-          const res = await window.electronAPI.msAuthRefresh(saved.refreshToken);
-          if (res.success) {
-            const newCfg = { ...cfg, msAccount: res.account };
-            setConfig(newCfg);
-            window.electronAPI.saveConfig(newCfg);
-            setMsAccount(res.account);
-            setAuthed(true);
-            window.electronAPI.getSkinUrl(res.account.name).then(setSkinUrl);
-          }
-        } catch (_) { /* token invalid — show auth screen */ }
-      } else {
-        setMsAccount(saved);
-        setAuthed(true);
-        window.electronAPI.getSkinUrl(saved.name).then(setSkinUrl);
-      }
-    });
-  }, []);
+  function addToast(message, type = 'info') {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  }
 
-  // Auto-updater events
-  useEffect(() => {
-    window.electronAPI.on('updater-available', ({ version }) =>
-      setUpdate(u => u?.status === 'downloading' || u?.status === 'ready' ? u : { status: 'available', version, percent: 0 }));
-    window.electronAPI.on('updater-progress', ({ percent }) =>
-      setUpdate(u => u ? { ...u, status: 'downloading', percent } : u));
-    window.electronAPI.on('updater-ready', ({ version }) =>
-      setUpdate({ status: 'ready', version, percent: 100 }));
-  }, []);
-
-  // Ping server on mount and every 30s
-  useEffect(() => {
-    const ping = () => {
-      window.electronAPI.pingServer().then(info => {
-        setServerInfo({ online: info.online, players: info.players, maxPlayers: info.maxPlayers || 3000, latency: info.latency });
-      }).catch(() => {});
-    };
-    ping();
-    const id = setInterval(ping, 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Subscribe to launch events
-  useEffect(() => {
-    window.electronAPI.on('launch-progress', (data) => {
-      const pct   = data.total > 0 ? Math.round((data.task / data.total) * 100) : 0;
-      const label = { assets: 'assets', client: 'client', natives: 'natives', download: 'téléchargement' };
-      const stage = `Téléchargement ${label[data.type] || data.type}… ${pct}%`;
-      setLaunchState(s => ({ ...s, progress: pct, stage,
-        logs: [...s.logs, { ts: timestamp(), msg: stage, ok: true }].slice(-20) }));
-    });
-
-    window.electronAPI.on('launch-data', (data) => {
-      if (data.type === 'debug') {
-        setLaunchState(s => ({
-          ...s, stage: data.msg,
-          logs: [...s.logs, { ts: timestamp(), msg: data.msg }].slice(-20)
-        }));
-      }
-    });
-
-    window.electronAPI.on('launch-close', (code) => {
-      setLaunchState(s => ({
-        ...s, running: false, progress: 100, stage: `Jeu fermé (code ${code}).`,
-        logs: [...s.logs, { ts: timestamp(), msg: `Processus terminé avec le code ${code}.`, ok: code === 0 }]
-      }));
-      setTimeout(() => setShowLaunch(false), 2000);
-    });
-
-    window.electronAPI.on('launch-error', (err) => {
-      setLaunchState(s => ({
-        ...s, running: false, stage: `Erreur : ${err.message}`,
-        logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${err.message}`, ok: false }]
-      }));
-    });
-  }, []);
+  function addLog(lvl, msg) {
+    setGlobalLogs(prev => [...prev, {
+      ts: new Date().toLocaleTimeString('fr-FR', { hour12: false }), lvl, msg
+    }].slice(-500));
+  }
 
   function timestamp() {
     return new Date().toLocaleTimeString('fr-FR', { hour12: false });
   }
 
+  // ── Boot sequence (replaces multiple useEffects) ──
+  useEffect(() => {
+    async function boot() {
+      try {
+        setSplashStatus('Chargement de la configuration…');
+        const [ver, cfg, sysInfo] = await Promise.all([
+          window.electronAPI.getAppVersion(),
+          window.electronAPI.getConfig(),
+          window.electronAPI.getSystemInfo(),
+        ]);
+        setAppVersion(ver);
+        setConfig(cfg);
+        setSystemInfo(sysInfo);
+        addLog('INFO', `Launcher démarré · v${ver} · ${sysInfo.platform} ${sysInfo.arch}`);
+        addLog('INFO', `RAM système : ${sysInfo.totalRam} Go`);
+
+        setSplashStatus('Vérification du compte…');
+        const saved = cfg.msAccount;
+        if (saved) {
+          const isExpired = !saved.expiresAt || Date.now() > saved.expiresAt - 60000;
+          if (isExpired) {
+            try {
+              const res = await window.electronAPI.msAuthRefresh(saved.refreshToken);
+              if (res.success) {
+                const newCfg = { ...cfg, msAccount: res.account };
+                setConfig(newCfg);
+                window.electronAPI.saveConfig(newCfg);
+                setMsAccount(res.account);
+                setAuthed(true);
+                window.electronAPI.getSkinUrl(res.account.name).then(setSkinUrl);
+                addLog('INFO', `Authentifié : ${res.account.name}`);
+              }
+            } catch (_) { addLog('WARN', 'Token expiré — reconnexion nécessaire'); }
+          } else {
+            setMsAccount(saved);
+            setAuthed(true);
+            window.electronAPI.getSkinUrl(saved.name).then(setSkinUrl);
+            addLog('INFO', `Authentifié : ${saved.name}`);
+          }
+        }
+
+        setSplashStatus('Connexion au serveur…');
+        try {
+          const info = await window.electronAPI.pingServer();
+          setServerInfo({ online: info.online, players: info.players, maxPlayers: info.maxPlayers || 3000, latency: info.latency });
+          addLog('INFO', info.online ? `Serveur en ligne · ${info.players} joueurs · ${info.latency}ms` : 'Serveur hors ligne');
+        } catch (_) { addLog('WARN', 'Ping serveur échoué'); }
+      } catch (e) {
+        addLog('ERR', `Erreur au démarrage : ${e.message}`);
+      } finally {
+        setSplashVisible(false);
+      }
+    }
+    boot();
+  }, []);
+
+  // ── Auto-updater events ──
+  useEffect(() => {
+    const onAvail = ({ version }) => {
+      setUpdate(u => u?.status === 'downloading' || u?.status === 'ready' ? u : { status: 'available', version, percent: 0 });
+      addLog('INFO', `Mise à jour v${version} détectée`);
+      addToast(`Mise à jour v${version} disponible`, 'info');
+    };
+    const onProg = ({ percent }) => setUpdate(u => u ? { ...u, status: 'downloading', percent } : u);
+    const onReady = ({ version }) => {
+      setUpdate({ status: 'ready', version, percent: 100 });
+      addToast(`v${version} prête à installer`, 'success');
+    };
+    window.electronAPI.on('updater-available', onAvail);
+    window.electronAPI.on('updater-progress', onProg);
+    window.electronAPI.on('updater-ready', onReady);
+    return () => {
+      window.electronAPI.off('updater-available', onAvail);
+      window.electronAPI.off('updater-progress', onProg);
+      window.electronAPI.off('updater-ready', onReady);
+    };
+  }, []);
+
+  // ── Server ping every 30s ──
+  useEffect(() => {
+    const id = setInterval(() => {
+      window.electronAPI.pingServer().then(info => {
+        setServerInfo({ online: info.online, players: info.players, maxPlayers: info.maxPlayers || 3000, latency: info.latency });
+      }).catch(() => {});
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Launch events ──
+  useEffect(() => {
+    const onProgress = (data) => {
+      const pct = data.total > 0 ? Math.round((data.task / data.total) * 100) : 0;
+      const label = { assets: 'assets', client: 'client', natives: 'natives', download: 'téléchargement' };
+      const stage = `Téléchargement ${label[data.type] || data.type}… ${pct}%`;
+      setLaunchState(s => ({ ...s, progress: 50 + pct / 2, stage,
+        logs: [...s.logs, { ts: timestamp(), msg: stage, ok: true }].slice(-20) }));
+    };
+    const onData = (data) => {
+      if (data.type === 'debug') {
+        setLaunchState(s => ({ ...s, stage: data.msg,
+          logs: [...s.logs, { ts: timestamp(), msg: data.msg }].slice(-20) }));
+        addLog('INFO', data.msg);
+      }
+    };
+    const onClose = (code) => {
+      setLaunchState(s => ({ ...s, running: false, progress: 100, stage: `Jeu fermé (code ${code}).`,
+        logs: [...s.logs, { ts: timestamp(), msg: `Processus terminé (code ${code}).`, ok: code === 0 }] }));
+      addLog(code === 0 ? 'INFO' : 'WARN', `Jeu fermé (code ${code})`);
+      addToast(code === 0 ? 'Jeu fermé' : `Jeu fermé (code ${code})`, code === 0 ? 'info' : 'warning');
+      setTimeout(() => setShowLaunch(false), 2000);
+    };
+    const onError = (err) => {
+      setLaunchState(s => ({ ...s, running: false, stage: `Erreur : ${err.message}`,
+        logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${err.message}`, ok: false }] }));
+      addLog('ERR', err.message);
+      addToast(`Erreur : ${err.message}`, 'error');
+    };
+    const onSync = (data) => {
+      const pct = Math.round((data.current / data.total) * 40);
+      setLaunchState(s => ({ ...s, progress: pct,
+        stage: `Synchronisation ${data.current}/${data.total} : ${data.name}…` }));
+    };
+
+    window.electronAPI.on('launch-progress', onProgress);
+    window.electronAPI.on('launch-data', onData);
+    window.electronAPI.on('launch-close', onClose);
+    window.electronAPI.on('launch-error', onError);
+    window.electronAPI.on('sync-progress', onSync);
+    return () => {
+      window.electronAPI.off('launch-progress', onProgress);
+      window.electronAPI.off('launch-data', onData);
+      window.electronAPI.off('launch-close', onClose);
+      window.electronAPI.off('launch-error', onError);
+      window.electronAPI.off('sync-progress', onSync);
+    };
+  }, []);
+
+  // ── Keyboard shortcuts ──
+  useEffect(() => { handlePlayRef.current = handlePlay; });
+  useEffect(() => {
+    const handler = (e) => {
+      if (!authed) return;
+      if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); handlePlayRef.current?.(); }
+      if (e.ctrlKey && e.key === ',') { e.preventDefault(); setScreen('settings'); }
+      if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        window.electronAPI.pingServer().then(info => {
+          setServerInfo({ online: info.online, players: info.players, maxPlayers: info.maxPlayers || 3000, latency: info.latency });
+          addToast('Serveur actualisé', 'info');
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [authed]);
+
+  // ── Handlers ──
   function handleAuth(account) {
     setMsAccount(account);
     setAuthed(true);
@@ -149,6 +238,8 @@ function App() {
     const newCfg = { ...config, msAccount: account };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
+    addLog('INFO', `Connecté : ${account.name}`);
+    addToast(`Bienvenue ${account.name} !`, 'success');
   }
 
   function handleLogout() {
@@ -158,10 +249,53 @@ function App() {
     const newCfg = { ...config, msAccount: null };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
+    addLog('INFO', 'Déconnecté');
+    addToast('Déconnecté', 'info');
+  }
+
+  async function handleAddAccount() {
+    try {
+      const res = await window.electronAPI.msAuthStart();
+      if (res.success) {
+        const saved = [...(config.savedAccounts || [])];
+        if (msAccount) saved.push(msAccount);
+        const newCfg = { ...config, msAccount: res.account, savedAccounts: saved };
+        setConfig(newCfg);
+        window.electronAPI.saveConfig(newCfg);
+        setMsAccount(res.account);
+        setSkinUrl(null);
+        window.electronAPI.getSkinUrl(res.account.name).then(setSkinUrl);
+        addToast(`Compte ${res.account.name} ajouté`, 'success');
+        addLog('INFO', `Nouveau compte : ${res.account.name}`);
+      } else {
+        addToast(res.error || 'Connexion échouée', 'error');
+      }
+    } catch (e) { addToast(e.message, 'error'); }
+  }
+
+  function handleSwitchAccount(account) {
+    const saved = (config.savedAccounts || []).filter(a => a.uuid !== account.uuid);
+    if (msAccount) saved.push(msAccount);
+    const newCfg = { ...config, msAccount: account, savedAccounts: saved };
+    setConfig(newCfg);
+    window.electronAPI.saveConfig(newCfg);
+    setMsAccount(account);
+    setSkinUrl(null);
+    window.electronAPI.getSkinUrl(account.name).then(setSkinUrl);
+    addToast(`Compte changé : ${account.name}`, 'success');
+    addLog('INFO', `Compte changé : ${account.name}`);
+  }
+
+  function handleRemoveAccount(uuid) {
+    const saved = (config.savedAccounts || []).filter(a => a.uuid !== uuid);
+    const newCfg = { ...config, savedAccounts: saved };
+    setConfig(newCfg);
+    window.electronAPI.saveConfig(newCfg);
+    addToast('Compte supprimé', 'info');
   }
 
   async function handlePlay() {
-    // flushSync garantit le rendu de l'overlay AVANT tout await
+    if (showLaunch) return;
     ReactDOM.flushSync(() => {
       setShowLaunch(true);
       setLaunchState({
@@ -169,46 +303,45 @@ function App() {
         logs: [{ ts: timestamp(), msg: 'Synchronisation des mods et configs…', ok: true }]
       });
     });
+    addLog('INFO', 'Lancement du jeu…');
 
     try {
-      // Phase 1 : sync mods + configs
       const syncRes = await window.electronAPI.syncFiles();
       if (!syncRes.success) {
-        setLaunchState(s => ({
-          ...s, running: false, stage: `Erreur sync : ${syncRes.error}`,
-          logs: [...s.logs, { ts: timestamp(), msg: `ERREUR sync : ${syncRes.error}`, ok: false }]
-        }));
+        setLaunchState(s => ({ ...s, running: false, stage: `Erreur sync : ${syncRes.error}`,
+          logs: [...s.logs, { ts: timestamp(), msg: `ERREUR sync : ${syncRes.error}`, ok: false }] }));
+        addToast(`Sync échouée : ${syncRes.error}`, 'error');
+        addLog('ERR', `Sync échouée : ${syncRes.error}`);
         return;
       }
+      addToast('Mods synchronisés', 'success');
 
-      // Phase 2 : lancement
-      setLaunchState(s => ({
-        ...s, stage: 'Démarrage du jeu…',
-        logs: [...s.logs, { ts: timestamp(), msg: `Lancement en tant que ${msAccount?.name}…`, ok: true }]
-      }));
+      setLaunchState(s => ({ ...s, progress: 45, stage: 'Démarrage du jeu…',
+        logs: [...s.logs, { ts: timestamp(), msg: `Lancement en tant que ${msAccount?.name}…`, ok: true }] }));
 
       const res = await window.electronAPI.launchGame({
         version: config.minecraftVersion,
-        maxRam:  config.maxRam,
-        minRam:  config.minRam,
+        maxRam: config.maxRam,
+        minRam: config.minRam,
       });
 
       if (!res.success) {
-        setLaunchState(s => ({
-          ...s, running: false, stage: `Erreur : ${res.error}`,
-          logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${res.error}`, ok: false }]
-        }));
-      } else if (res.bannedMods && res.bannedMods.length > 0) {
-        setLaunchState(s => ({
-          ...s,
-          logs: [...s.logs, { ts: timestamp(), msg: `Mods bannis supprimés : ${res.bannedMods.join(', ')}`, ok: true }]
-        }));
+        setLaunchState(s => ({ ...s, running: false, stage: `Erreur : ${res.error}`,
+          logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${res.error}`, ok: false }] }));
+        addToast(`Erreur : ${res.error}`, 'error');
+        addLog('ERR', res.error);
+      } else {
+        addLog('INFO', 'Jeu lancé');
+        if (res.bannedMods?.length > 0) {
+          addLog('WARN', `Mods bannis supprimés : ${res.bannedMods.join(', ')}`);
+          addToast(`${res.bannedMods.length} mod(s) banni(s) supprimé(s)`, 'warning');
+        }
       }
     } catch (e) {
-      setLaunchState(s => ({
-        ...s, running: false, stage: `Erreur : ${e.message}`,
-        logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${e.message}`, ok: false }]
-      }));
+      setLaunchState(s => ({ ...s, running: false, stage: `Erreur : ${e.message}`,
+        logs: [...s.logs, { ts: timestamp(), msg: `ERREUR : ${e.message}`, ok: false }] }));
+      addToast(`Erreur : ${e.message}`, 'error');
+      addLog('ERR', e.message);
     }
   }
 
@@ -216,23 +349,38 @@ function App() {
     const newCfg = { ...config, ...updates };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
+    addToast('Paramètres enregistrés', 'success');
   }
 
+  // ── Render ──
+  if (splashVisible) return (
+    <>
+      <SplashScreen version={appVersion} status={splashStatus} />
+      <ToastContainer toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
+    </>
+  );
+
   if (!config) return null;
-  if (!authed) return <AuthScreen onAuth={handleAuth} />;
+  if (!authed) return (
+    <>
+      <AuthScreen onAuth={handleAuth} version={appVersion} />
+      <ToastContainer toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
+    </>
+  );
 
   const username = msAccount?.name || '';
   const user = { name: username, initials: username[0]?.toUpperCase() || '?', rank: 'JOUEUR' };
 
   const renderScreen = () => {
     switch (screen) {
-      case 'home':     return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} />;
-      case 'mods':     return <ModsScreen />;
+      case 'home':     return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} mcVersion={config.minecraftVersion} addToast={addToast} />;
+      case 'mods':     return <ModsScreen addToast={addToast} />;
       case 'profiles': return <ProfileScreen config={config} onSave={handleConfigSave} />;
       case 'store':    return <StoreScreen />;
-      case 'account':  return <AccountScreen msAccount={msAccount} onLogout={handleLogout} />;
-      case 'logs':     return <LogsScreen />;
-      default:         return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} />;
+      case 'account':  return <AccountScreen msAccount={msAccount} config={config} onLogout={handleLogout} onAddAccount={handleAddAccount} onSwitchAccount={handleSwitchAccount} onRemoveAccount={handleRemoveAccount} addToast={addToast} />;
+      case 'settings': return <SettingsScreen config={config} onSave={handleConfigSave} systemInfo={systemInfo} addToast={addToast} />;
+      case 'logs':     return <LogsScreen logs={globalLogs} addToast={addToast} />;
+      default:         return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} addToast={addToast} />;
     }
   };
 
@@ -240,17 +388,15 @@ function App() {
     <>
       {update && <UpdateBanner update={update} onDismiss={() => setUpdate(null)} />}
       <div className="app" style={{ marginTop: update ? 32 : 0 }}>
-        <TopBar user={user} onNav={setScreen} />
+        <TopBar user={user} onNav={setScreen} version={appVersion} />
         <Sidebar active={screen} onNav={setScreen} />
         <main className="main">{renderScreen()}</main>
         <StatusBar ping={serverInfo.latency} server={{ up: serverInfo.online, players: serverInfo.players, max: serverInfo.maxPlayers }} />
       </div>
       {showLaunch && (
-        <LaunchOverlay
-          state={launchState}
-          onClose={() => { if (!launchState.running) setShowLaunch(false); }}
-        />
+        <LaunchOverlay state={launchState} onClose={() => { if (!launchState.running) setShowLaunch(false); }} />
       )}
+      <ToastContainer toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
     </>
   );
 }

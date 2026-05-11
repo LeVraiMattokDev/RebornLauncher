@@ -1,6 +1,6 @@
 {
   "name": "reborn-launcher",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "description": "RebornMC Minecraft Launcher",
   "main": "main.js",
   "scripts": {

@@ -23,6 +23,8 @@ const Icon = ({ name, size = 18 }) => {
     chat:     <path d="M21 12a8 8 0 0 1-12 7l-5 1 1-5a8 8 0 1 1 16-3z" />,
     close:    <><path d="M6 6l12 12M18 6L6 18" /></>,
     edit:     <><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></>,
+    check:    <path d="M5 13l4 4L19 7" />,
+    trash:    <><path d="M3 6h18M8 6V4h8v2" /><path d="M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" /><path d="M10 11v6M14 11v6" /></>,
   };
   return (
     <svg className="nav-icon" width={size} height={size} viewBox="0 0 24 24"
@@ -34,44 +36,32 @@ const Icon = ({ name, size = 18 }) => {
 };
 
 /* ============== 3D Skin Viewer ============== */
-function SkinViewer3D({ skinUrl, username, width = 140, height = 190 }) {
+function SkinViewer3D({ skinUrl, username, width = 200, height = 260 }) {
   const canvasRef = useRef(null);
   const viewerRef = useRef(null);
 
-  // Créer le viewer une seule fois au montage
   useEffect(() => {
     if (!canvasRef.current || !window.skinview3d) return;
     try {
       const viewer = new window.skinview3d.SkinViewer({
-        canvas: canvasRef.current,
-        width,
-        height,
+        canvas: canvasRef.current, width, height,
       });
-
       if (viewer.camera) {
         viewer.camera.rotation.x = -0.2;
-        viewer.camera.position.z = 50;
+        viewer.camera.position.z = 70;
       }
-      viewer.autoRotate = false;
+      viewer.autoRotate = true;
+      viewer.autoRotateSpeed = 0.4;
       if (viewer.controls) viewer.controls.enableZoom = false;
-
       if (window.skinview3d.WalkingAnimation) {
         const anim = viewer.loadAnimation(window.skinview3d.WalkingAnimation);
         if (anim) anim.speed = 0.6;
       }
-
       viewerRef.current = viewer;
+      return () => { try { viewer.dispose(); } catch (_) {} viewerRef.current = null; };
+    } catch (e) { console.warn('SkinViewer3D init failed:', e.message); }
+  }, []);
 
-      return () => {
-        try { viewer.dispose(); } catch (_) {}
-        viewerRef.current = null;
-      };
-    } catch (e) {
-      console.warn('SkinViewer3D init failed:', e.message);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Charger la skin quand l'URL change
   useEffect(() => {
     if (!viewerRef.current) return;
     const steve = 'https://crafatar.com/skins/8667ba71-b85a-4004-af54-457a9734eed7';
@@ -80,9 +70,7 @@ function SkinViewer3D({ skinUrl, username, width = 140, height = 190 }) {
       viewerRef.current.loadSkin(url).catch(() => {
         if (viewerRef.current) viewerRef.current.loadSkin(steve).catch(() => {});
       });
-    } catch (e) {
-      console.warn('SkinViewer3D loadSkin failed:', e.message);
-    }
+    } catch (e) { console.warn('SkinViewer3D loadSkin failed:', e.message); }
   }, [skinUrl]);
 
   return (
@@ -93,7 +81,7 @@ function SkinViewer3D({ skinUrl, username, width = 140, height = 190 }) {
 }
 
 /* ============== TopBar ============== */
-function TopBar({ user, onNav }) {
+function TopBar({ user, onNav, version }) {
   return (
     <div className="topbar">
       <div className="titlebar-drag" />
@@ -101,20 +89,18 @@ function TopBar({ user, onNav }) {
         <div className="brand-mark"><img src="./assets/logo.png" style={{ width: 22, height: 22, objectFit: 'contain' }} /></div>
         <div className="brand-text">
           <div className="brand-name">REBORNMC</div>
-          <div className="brand-sub">Launcher v1.0.4</div>
+          <div className="brand-sub">Launcher v{version}</div>
         </div>
       </div>
       <div className="topbar-spacer" />
       <div className="topbar-actions">
-        <button className="icon-btn" title="Notifications">
-          <Icon name="bell" size={16} />
-        </button>
+        <button className="icon-btn" title="Notifications"><Icon name="bell" size={16} /></button>
       </div>
       <div className="user-chip" onClick={() => onNav('account')}>
         <div className="user-avatar online">{user.initials}</div>
         <div>
           <div className="user-name">{user.name}</div>
-          <div className="user-rank">HORS-LIGNE</div>
+          <div className="user-rank">Microsoft</div>
         </div>
         <Icon name="chev" size={14} />
       </div>
@@ -131,27 +117,38 @@ function TopBar({ user, onNav }) {
 function Sidebar({ active, onNav }) {
   const items = [
     { group: "Jouer" },
-    { id: "home",        label: "Accueil",      icon: "home" },
-    { id: "mods",        label: "Mods",         icon: "cube" },
-    { id: "profiles",   label: "Profil",        icon: "layers" },
+    { id: "home",      label: "Accueil",      icon: "home" },
+    { id: "mods",      label: "Mods",         icon: "cube" },
+    { id: "profiles",  label: "Profil",       icon: "layers" },
     { group: "Serveur" },
-    { id: "store",       label: "Boutique",     icon: "store", badge: "NEW" },
+    { id: "store",     label: "Boutique",     icon: "store", badge: "NEW" },
     { group: "Vous" },
-    { id: "account",     label: "Compte",       icon: "user" },
-    { id: "logs",        label: "Logs",         icon: "log" },
+    { id: "account",   label: "Comptes",      icon: "user" },
+    { id: "settings",  label: "Paramètres",   icon: "cog" },
+    { id: "logs",      label: "Logs",         icon: "log" },
   ];
   return (
     <div className="sidebar">
       {items.map((it, i) => {
         if (it.group) return <div key={`g-${i}`} className="nav-label">{it.group}</div>;
         return (
-          <button key={it.id} className={`nav-item${active === it.id ? " active" : ""}`} onClick={() => onNav(it.id)}>
+          <button key={it.id}
+            className={`nav-item${active === it.id ? " active" : ""}`}
+            onClick={() => onNav(it.id)} title={it.label}>
             <Icon name={it.icon} />
             <span className="nav-text">{it.label}</span>
             {it.badge && <span className="nav-badge">{it.badge}</span>}
           </button>
         );
       })}
+      <div style={{ flex: 1 }} />
+      <div style={{
+        padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.06)',
+        marginTop: 8, fontSize: 9, color: 'var(--text-faint)',
+        fontFamily: 'var(--mono-font)', textAlign: 'center', opacity: 0.5,
+      }}>
+        Ctrl+Enter jouer · Ctrl+, paramètres
+      </div>
     </div>
   );
 }
@@ -173,9 +170,7 @@ function StatusBar({ ping, server }) {
       <div className="tick-text">
         <span>région : EU-West</span>
         <span className="tick-sep">·</span>
-        <span>build 2026.5.10-r1</span>
-        <span className="tick-sep">·</span>
-        <span>java 21.0.4</span>
+        <span>Ctrl+R actualiser</span>
       </div>
     </div>
   );
@@ -186,4 +181,39 @@ const Switch = ({ on, onChange }) => (
   <button className={`switch${on ? " on" : ""}`} onClick={() => onChange(!on)} />
 );
 
-Object.assign(window, { Icon, SkinViewer3D, TopBar, Sidebar, StatusBar, Switch });
+/* ============== Toast Container ============== */
+function ToastContainer({ toasts, onDismiss }) {
+  if (!toasts || toasts.length === 0) return null;
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast toast-${t.type || 'info'}`}>
+          <div className="toast-content">
+            <span className={`toast-icon toast-icon-${t.type || 'info'}`} />
+            <span className="toast-msg">{t.message}</span>
+          </div>
+          <button className="toast-close" onClick={() => onDismiss(t.id)}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============== Splash Screen ============== */
+function SplashScreen({ version, status }) {
+  return (
+    <div className="splash-overlay">
+      <div className="splash-content">
+        <div className="splash-logo">
+          <img src="./assets/logo.png" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+        </div>
+        <div className="splash-title">REBORNMC</div>
+        <div className="splash-version">{version ? `v${version}` : ''}</div>
+        <div className="splash-spinner-wrap"><div className="splash-spinner" /></div>
+        <div className="splash-status">{status}</div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Icon, SkinViewer3D, TopBar, Sidebar, StatusBar, Switch, ToastContainer, SplashScreen });

@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const net  = require('net');
+const os   = require('os');
 
 // ── Minecraft server ping ─────────────────────────────────────────────────────
 function writeVarInt(v) {
@@ -66,7 +67,7 @@ function createWindow() {
     icon: path.join(__dirname, 'assets', 'logo.ico'),
     frame: false,
     titleBarStyle: 'hidden',
-    backgroundColor: '#0B0E14',
+    backgroundColor: '#080B12',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -89,6 +90,9 @@ app.whenReady().then(() => {
     mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
   });
 
+  // ── App version ──────────────────────────────────────────────────────────
+  ipcMain.handle('get-app-version', () => app.getVersion());
+
   // ── Config ───────────────────────────────────────────────────────────────
   const configModule = require('./src/config');
   ipcMain.handle('get-config',  ()        => configModule.load());
@@ -109,23 +113,100 @@ app.whenReady().then(() => {
     }
   });
 
-  // ── Mod list ──────────────────────────────────────────────────────────────
+  // ── System info ───────────────────────────────────────────────────────────
+  ipcMain.handle('get-system-info', () => ({
+    totalRam: Math.round(os.totalmem() / (1024 * 1024 * 1024)),
+    freeRam: Math.round(os.freemem() / (1024 * 1024 * 1024)),
+    platform: process.platform,
+    arch: process.arch,
+  }));
+
+  // ── Mod list (includes disabled) ──────────────────────────────────────────
   ipcMain.handle('list-mods', () => {
     const cfg = configModule.load();
     const modsDir = path.join(cfg.minecraftPath, 'mods');
     if (!fs.existsSync(modsDir)) return [];
     try {
       return fs.readdirSync(modsDir)
-        .filter(f => f.endsWith('.jar'))
+        .filter(f => f.endsWith('.jar') || f.endsWith('.jar.disabled'))
         .map(f => {
           const stat = fs.statSync(path.join(modsDir, f));
+          const disabled = f.endsWith('.disabled');
           return {
-            name:     f.replace(/\.jar$/, ''),
+            name:     f.replace(/\.jar(\.disabled)?$/, ''),
             filename: f,
             size:     (stat.size / (1024 * 1024)).toFixed(1) + ' Mo',
+            enabled:  !disabled,
           };
         });
     } catch (_) { return []; }
+  });
+
+  // ── Toggle mod (enable/disable) ───────────────────────────────────────────
+  ipcMain.handle('toggle-mod', (_e, filename) => {
+    const cfg = configModule.load();
+    const modsDir = path.join(cfg.minecraftPath, 'mods');
+    const filePath = path.join(modsDir, filename);
+    try {
+      if (filename.endsWith('.disabled')) {
+        const enabledPath = filePath.slice(0, -'.disabled'.length);
+        fs.renameSync(filePath, enabledPath);
+        return { enabled: true, newFilename: path.basename(enabledPath) };
+      } else {
+        const disabledPath = filePath + '.disabled';
+        fs.renameSync(filePath, disabledPath);
+        return { enabled: false, newFilename: filename + '.disabled' };
+      }
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  // ── Open folders ──────────────────────────────────────────────────────────
+  ipcMain.handle('open-mods-folder', () => {
+    const cfg = configModule.load();
+    const modsDir = path.join(cfg.minecraftPath, 'mods');
+    if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+    shell.openPath(modsDir);
+  });
+
+  ipcMain.handle('open-game-folder', () => {
+    const cfg = configModule.load();
+    if (!fs.existsSync(cfg.minecraftPath)) fs.mkdirSync(cfg.minecraftPath, { recursive: true });
+    shell.openPath(cfg.minecraftPath);
+  });
+
+  // ── Select directory dialog ───────────────────────────────────────────────
+  ipcMain.handle('select-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Choisir le dossier Minecraft',
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
+  });
+
+  // ── Reset config ──────────────────────────────────────────────────────────
+  ipcMain.handle('reset-config', () => {
+    const cfg = configModule.load();
+    const fresh = configModule.getDefaults();
+    fresh.msAccount = cfg.msAccount;
+    fresh.savedAccounts = cfg.savedAccounts || [];
+    configModule.save(fresh);
+    return fresh;
+  });
+
+  // ── News from GitHub ──────────────────────────────────────────────────────
+  ipcMain.handle('get-news', async () => {
+    try {
+      const cfg = configModule.load();
+      const { fetchJSON } = require('./src/http');
+      const file = await fetchJSON(`https://api.github.com/repos/${cfg.githubRepo}/contents/news.json`);
+      const content = Buffer.from(file.content, 'base64').toString('utf-8');
+      return JSON.parse(content);
+    } catch (_) {
+      return [];
+    }
   });
 
   // ── Microsoft auth ────────────────────────────────────────────────────────
@@ -156,22 +237,19 @@ app.whenReady().then(() => {
 
   ipcMain.handle('sync-files', async (event) => {
     const cfg = configModule.load();
-    console.log('[sync-files] githubRepo =', cfg.githubRepo);
     if (!cfg.githubRepo) return { success: true };
 
     const mcPath    = cfg.minecraftPath;
     const modsDir   = path.join(mcPath, 'mods');
     const configDir = path.join(mcPath, 'config');
-    const send      = d => {
-      console.log('[sync-files] event:', d.msg);
-      event.sender.send('launch-data', d);
-    };
+    const send      = d => event.sender.send('launch-data', d);
+    const onSyncProgress = d => event.sender.send('sync-progress', d);
 
     if (!fs.existsSync(modsDir))   fs.mkdirSync(modsDir,   { recursive: true });
     if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
 
     try {
-      await syncMods({ githubRepo: cfg.githubRepo, modsDir, onData: send });
+      await syncMods({ githubRepo: cfg.githubRepo, modsDir, onData: send, onProgress: onSyncProgress });
       await syncConfigs({ githubRepo: cfg.githubRepo, configDir, remoteConfigPath: 'mods/config', onData: send });
       return { success: true };
     } catch (e) {
@@ -187,7 +265,6 @@ app.whenReady().then(() => {
 
     if (!msAccount) return { success: false, error: 'Compte Microsoft non connecté.' };
 
-    // Refresh token if expired or close to expiry
     if (!msAccount.expiresAt || Date.now() > msAccount.expiresAt - 60000) {
       try {
         const res = await refreshAuth(msAccount.refreshToken);
@@ -211,11 +288,20 @@ app.whenReady().then(() => {
         version:    opts.version || cfg.minecraftVersion,
         maxRam:     opts.maxRam  || cfg.maxRam,
         minRam:     opts.minRam  || cfg.minRam,
+        jvmArgs:    cfg.jvmArgs  || '',
         onProgress: data => event.sender.send('launch-progress', data),
         onData:     data => event.sender.send('launch-data', data),
-        onClose:    code => event.sender.send('launch-close', code),
+        onClose:    code => {
+          event.sender.send('launch-close', code);
+          if (cfg.closeLauncherOnStart && mainWindow) mainWindow.show();
+        },
         onError:    err  => event.sender.send('launch-error', { message: err?.message || String(err) }),
       });
+
+      if (cfg.closeLauncherOnStart && mainWindow) {
+        setTimeout(() => mainWindow.minimize(), 2000);
+      }
+
       return { success: true, bannedMods: banResult.deleted };
     } catch (e) {
       return { success: false, error: e.message };

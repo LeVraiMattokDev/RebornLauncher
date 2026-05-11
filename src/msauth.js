@@ -87,7 +87,9 @@ async function getXblToken(msAccessToken) {
     TokenType: 'JWT',
   });
   if (!res.Token) throw new Error('Impossible d\'obtenir le token Xbox Live.');
-  return { token: res.Token, uhs: res.DisplayClaims.xui[0].uhs };
+  const uhs = res.DisplayClaims?.xui?.[0]?.uhs;
+  if (!uhs) throw new Error('Réponse Xbox Live invalide (DisplayClaims manquant).');
+  return { token: res.Token, uhs };
 }
 
 async function getXstsToken(xblToken) {
@@ -106,7 +108,9 @@ async function getXstsToken(xblToken) {
     };
     throw new Error(known[res.XErr] || `Erreur Xbox : ${res.XErr}`);
   }
-  return { token: res.Token, uhs: res.DisplayClaims.xui[0].uhs };
+  const xuhs = res.DisplayClaims?.xui?.[0]?.uhs;
+  if (!xuhs) throw new Error('Réponse XSTS invalide (DisplayClaims manquant).');
+  return { token: res.Token, uhs: xuhs };
 }
 
 async function getMcToken(uhs, xstsToken) {

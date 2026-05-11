@@ -13,7 +13,10 @@
       "WebFetch(domain:api.github.com)",
       "Bash(mkdir -p /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor)",
       "Bash(cp /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/node_modules/react/umd/react.development.js /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor/)",
-      "Bash(cp /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/node_modules/react-dom/umd/react-dom.development.js /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor/)"
+      "Bash(cp /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/node_modules/react-dom/umd/react-dom.development.js /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor/)",
+      "Bash(npm start:*)",
+      "Bash(disown)",
+      "Bash(timeout 15 bash:*)"
     ]
   },
   "disabledMcpjsonServers": [
