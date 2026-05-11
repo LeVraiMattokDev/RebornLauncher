@@ -3,3 +3,4 @@ dist/RebornMC Launcher Setup 1.0.0.exe.blockmap
 node_modules/electron/dist/electron.exe
 dist/
 *.local
+.claude/settings.local.json
