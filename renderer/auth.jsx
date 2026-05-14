@@ -24,6 +24,12 @@ function AuthScreen({ onAuth, version }) {
 
   return (
     <div className="auth-overlay">
+      <div className="titlebar-drag" style={{ position: 'fixed', top: 0, left: 0, right: 80, height: 36, zIndex: 10001 }} />
+      <div className="titlebar-controls" style={{ position: 'fixed', top: 8, right: 12, zIndex: 10001 }}>
+        <button className="wc-btn wc-min" title="Réduire" onClick={() => window.electronAPI.minimizeWindow()} />
+        <button className="wc-btn wc-max" title="Agrandir" onClick={() => window.electronAPI.maximizeWindow()} />
+        <button className="wc-btn wc-close" title="Fermer" onClick={() => window.electronAPI.closeWindow()} />
+      </div>
       <div className="auth-box">
         <div className="auth-brand">
           <div className="auth-logo">

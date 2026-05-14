@@ -4,3 +4,4 @@ node_modules/electron/dist/electron.exe
 dist/
 *.local
 .claude/settings.local.json
+.claude/settings.local.json
