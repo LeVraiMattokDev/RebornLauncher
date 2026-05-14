@@ -422,7 +422,7 @@ function LogsScreen({ logs = [], addToast }) {
 }
 
 /* ============ Launch Overlay ============ */
-function LaunchOverlay({ state, onClose }) {
+function LaunchOverlay({ state, onClose, onCancel }) {
   const { progress, stage, logs, running } = state;
   return (
     <div className="patch-overlay">
@@ -434,7 +434,7 @@ function LaunchOverlay({ state, onClose }) {
           </button>
         )}
         <div className="patch-title">{running ? 'Préparation du jeu…' : 'Jeu lancé.'}</div>
-        <div className="patch-sub">{stage}</div>
+        <div className="patch-sub">{(stage || '').length > 140 ? stage.slice(0, 140) + '…' : stage}</div>
         <div className="progress-track">
           <div className="progress-fill" style={{ width: Math.min(100, progress) + "%" }} />
         </div>
@@ -450,6 +450,13 @@ function LaunchOverlay({ state, onClose }) {
             </div>
           ))}
         </div>
+        {running && (
+          <div className="patch-actions">
+            <button className="btn btn-sm" style={{ color: 'var(--red)', borderColor: 'rgba(248,113,113,0.3)' }} onClick={onCancel}>
+              <Icon name="close" size={13} /> Annuler
+            </button>
+          </div>
+        )}
         {!running && (
           <div className="patch-actions">
             <button className="btn btn-primary btn-sm" onClick={onClose}>Fermer</button>
@@ -460,7 +467,39 @@ function LaunchOverlay({ state, onClose }) {
   );
 }
 
+/* ============ Crash Reporter ============ */
+function CrashReporter({ code, logs, onClose }) {
+  function copyLogs() {
+    const text = (logs || []).map(l => `[${l.ts}] ${l.msg}`).join('\n');
+    navigator.clipboard.writeText(`Minecraft crash — code ${code}\n\n${text}`).catch(() => {});
+  }
+  return (
+    <div className="patch-overlay">
+      <div className="patch-window" style={{ borderColor: 'rgba(248,113,113,0.4)' }}>
+        <div className="patch-corner" style={{ color: 'var(--red)' }}>▣ CRASH DÉTECTÉ</div>
+        <div className="patch-title" style={{ color: 'var(--red)' }}>Minecraft a planté</div>
+        <div className="patch-sub">Code de sortie : <b style={{ fontFamily: 'var(--mono-font)' }}>{code}</b> — consulte les logs ci-dessous.</div>
+        <div className="progress-stage" style={{ maxHeight: 200, overflowY: 'auto' }}>
+          {(logs || []).map((l, i) => (
+            <div key={i} className="log-line">
+              <span className="ts">[{l.ts}]</span>
+              <span className={l.ok === false ? "err-text" : ""} style={{ gridColumn: "2 / 4" }}>{l.msg}</span>
+            </div>
+          ))}
+        </div>
+        <div className="patch-actions">
+          <button className="btn btn-sm" onClick={copyLogs}><Icon name="copy" size={13} /> Copier les logs</button>
+          <button className="btn btn-sm" onClick={() => window.electronAPI.openUrl('https://discord.gg/rebornmc')}>
+            <Icon name="chat" size={13} /> Support Discord
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={onClose}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   HomeScreen, ModsScreen, ProfileScreen, StoreScreen,
-  AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay
+  AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay, CrashReporter
 });

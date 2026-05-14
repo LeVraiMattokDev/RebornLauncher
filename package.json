@@ -1,6 +1,6 @@
 {
   "name": "reborn-launcher",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "RebornMC Minecraft Launcher",
   "main": "main.js",
   "scripts": {
@@ -37,6 +37,7 @@
     }
   },
   "dependencies": {
+    "discord-rpc": "^4.0.1",
     "minecraft-launcher-core": "^3.17.0"
   },
   "devDependencies": {

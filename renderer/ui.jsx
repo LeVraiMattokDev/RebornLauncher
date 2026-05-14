@@ -25,6 +25,8 @@ const Icon = ({ name, size = 18 }) => {
     edit:     <><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></>,
     check:    <path d="M5 13l4 4L19 7" />,
     trash:    <><path d="M3 6h18M8 6V4h8v2" /><path d="M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" /><path d="M10 11v6M14 11v6" /></>,
+    copy:     <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
+    warning:  <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></>,
   };
   return (
     <svg className="nav-icon" width={size} height={size} viewBox="0 0 24 24"
@@ -187,12 +189,16 @@ function ToastContainer({ toasts, onDismiss }) {
   return (
     <div className="toast-container">
       {toasts.map(t => (
-        <div key={t.id} className={`toast toast-${t.type || 'info'}`}>
+        <div key={t.id} className={`toast toast-${t.type || 'info'}`}
+          style={t.url ? { cursor: 'pointer' } : {}}
+          onClick={t.url ? () => { window.electronAPI.openUrl(t.url); onDismiss(t.id); } : undefined}
+        >
           <div className="toast-content">
             <span className={`toast-icon toast-icon-${t.type || 'info'}`} />
             <span className="toast-msg">{t.message}</span>
+            {t.url && <span style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 4 }}>↗</span>}
           </div>
-          <button className="toast-close" onClick={() => onDismiss(t.id)}>×</button>
+          <button className="toast-close" onClick={(e) => { e.stopPropagation(); onDismiss(t.id); }}>×</button>
         </div>
       ))}
     </div>

@@ -5,11 +5,12 @@ function SettingsScreen({ config, onSave, systemInfo, addToast }) {
   const [mcPath, setMcPath] = useState(config.minecraftPath || '');
   const [closeLauncher, setCloseLauncher] = useState(config.closeLauncherOnStart || false);
   const [jvmArgs, setJvmArgs] = useState(config.jvmArgs || '');
+  const [showAnnouncements, setShowAnnouncements] = useState(config.showAnnouncements !== false);
 
   const totalRam = systemInfo?.totalRam || 16;
 
   function save() {
-    onSave({ minecraftPath: mcPath, closeLauncherOnStart: closeLauncher, jvmArgs });
+    onSave({ minecraftPath: mcPath, closeLauncherOnStart: closeLauncher, jvmArgs, showAnnouncements });
   }
 
   async function browse() {
@@ -60,6 +61,13 @@ function SettingsScreen({ config, onSave, systemInfo, addToast }) {
               <div className="field-hint">Minimiser le launcher quand le jeu se lance.</div>
             </div>
             <Switch on={closeLauncher} onChange={setCloseLauncher} />
+          </div>
+          <div className="field">
+            <div>
+              <div className="field-label">Notifications boutique</div>
+              <div className="field-hint">Afficher les promotions et annonces au démarrage.</div>
+            </div>
+            <Switch on={showAnnouncements} onChange={setShowAnnouncements} />
           </div>
         </div>
 

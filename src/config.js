@@ -18,6 +18,8 @@ function getDefaults() {
     minRam: '2',
     closeLauncherOnStart: false,
     jvmArgs: '',
+    showAnnouncements: true,
+    seenAnnouncements: [],
   };
 }
 

@@ -1,7 +1,7 @@
 /* global React, ReactDOM,
    TopBar, Sidebar, StatusBar, AuthScreen, SplashScreen, ToastContainer,
    HomeScreen, ModsScreen, ProfileScreen, StoreScreen, SettingsScreen,
-   AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay */
+   AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay, CrashReporter */
 
 const { useState, useEffect, useRef } = React;
 
@@ -54,14 +54,16 @@ function App() {
   const [splashStatus, setSplashStatus] = useState('Chargement…');
   const [globalLogs, setGlobalLogs]     = useState([]);
   const [systemInfo, setSystemInfo]     = useState(null);
+  const [crashReport, setCrashReport]   = useState(null);
 
-  const toastIdRef = useRef(0);
+  const toastIdRef    = useRef(0);
   const handlePlayRef = useRef(null);
+  const crashLogsRef  = useRef(null);
 
-  function addToast(message, type = 'info') {
+  function addToast(message, type = 'info', duration = 4000, url = null) {
     const id = ++toastIdRef.current;
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+    setToasts(prev => [...prev, { id, message, type, url }]);
+    if (duration > 0) setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
   }
 
   function addLog(lvl, msg) {
@@ -121,6 +123,36 @@ function App() {
           setServerInfo({ online: info.online, players: info.players, maxPlayers: info.maxPlayers || 3000, latency: info.latency });
           addLog('INFO', info.online ? `Serveur en ligne · ${info.players} joueurs · ${info.latency}ms` : 'Serveur hors ligne');
         } catch (_) { addLog('WARN', 'Ping serveur échoué'); }
+
+        // ── Java check ──
+        try {
+          const javaInfo = await window.electronAPI.checkJava();
+          if (!javaInfo.found) {
+            addLog('WARN', `Java introuvable : ${javaInfo.error}`);
+            addToast('Java introuvable ! Installe Java 21 sur adoptium.net', 'error', 8000, 'https://adoptium.net');
+          } else {
+            addLog('INFO', `Java : ${javaInfo.path}`);
+          }
+        } catch (_) {}
+
+        // ── Announcements ──
+        try {
+          if (cfg.showAnnouncements !== false) {
+            const announcements = await window.electronAPI.getAnnouncements();
+            const seen = cfg.seenAnnouncements || [];
+            const unseen = announcements.filter(a => a.active && !seen.includes(a.id));
+            for (const a of unseen) {
+              addToast(a.title + (a.message ? ` — ${a.message}` : ''), 'promo', 10000, a.url || null);
+              addLog('INFO', `Annonce : ${a.title}`);
+            }
+            if (unseen.length > 0) {
+              const newCfg = { ...cfg, seenAnnouncements: [...seen, ...unseen.map(a => a.id)] };
+              window.electronAPI.saveConfig(newCfg);
+              setConfig(newCfg);
+            }
+          }
+        } catch (_) {}
+
       } catch (e) {
         addLog('ERR', `Erreur au démarrage : ${e.message}`);
       } finally {
@@ -173,17 +205,31 @@ function App() {
     };
     const onData = (data) => {
       if (data.type === 'debug') {
-        setLaunchState(s => ({ ...s, stage: data.msg,
+        // Filtre le message classpath (trop long, inutile dans le stage)
+        const isClasspath = data.msg.includes('Launching with arguments');
+        const displayMsg = isClasspath ? 'Démarrage de Minecraft…' : data.msg;
+        setLaunchState(s => ({ ...s, stage: displayMsg,
           logs: [...s.logs, { ts: timestamp(), msg: data.msg }].slice(-20) }));
         addLog('INFO', data.msg);
       }
     };
     const onClose = (code) => {
-      setLaunchState(s => ({ ...s, running: false, progress: 100, stage: `Jeu fermé (code ${code}).`,
-        logs: [...s.logs, { ts: timestamp(), msg: `Processus terminé (code ${code}).`, ok: code === 0 }] }));
+      setLaunchState(s => {
+        const newLogs = [...s.logs, { ts: timestamp(), msg: `Processus terminé (code ${code}).`, ok: code === 0 }];
+        if (code !== 0) crashLogsRef.current = newLogs;
+        return { ...s, running: false, progress: 100, stage: `Jeu fermé (code ${code}).`, logs: newLogs };
+      });
       addLog(code === 0 ? 'INFO' : 'WARN', `Jeu fermé (code ${code})`);
-      addToast(code === 0 ? 'Jeu fermé' : `Jeu fermé (code ${code})`, code === 0 ? 'info' : 'warning');
-      setTimeout(() => setShowLaunch(false), 2000);
+      if (code !== 0) {
+        addToast(`Minecraft a crashé (code ${code})`, 'error');
+        setTimeout(() => {
+          setCrashReport({ code, logs: crashLogsRef.current || [] });
+          setShowLaunch(false);
+        }, 600);
+      } else {
+        addToast('Jeu fermé', 'info');
+        setTimeout(() => setShowLaunch(false), 2000);
+      }
     };
     const onError = (err) => {
       setLaunchState(s => ({ ...s, running: false, stage: `Erreur : ${err.message}`,
@@ -345,6 +391,14 @@ function App() {
     }
   }
 
+  async function handleCancel() {
+    await window.electronAPI.cancelLaunch();
+    setLaunchState(s => ({ ...s, running: false, stage: 'Lancement annulé.' }));
+    addToast('Lancement annulé', 'info');
+    addLog('INFO', 'Lancement annulé par l\'utilisateur');
+    setTimeout(() => setShowLaunch(false), 1500);
+  }
+
   function handleConfigSave(updates) {
     const newCfg = { ...config, ...updates };
     setConfig(newCfg);
@@ -394,7 +448,18 @@ function App() {
         <StatusBar ping={serverInfo.latency} server={{ up: serverInfo.online, players: serverInfo.players, max: serverInfo.maxPlayers }} />
       </div>
       {showLaunch && (
-        <LaunchOverlay state={launchState} onClose={() => { if (!launchState.running) setShowLaunch(false); }} />
+        <LaunchOverlay
+          state={launchState}
+          onClose={() => { if (!launchState.running) setShowLaunch(false); }}
+          onCancel={handleCancel}
+        />
+      )}
+      {crashReport && (
+        <CrashReporter
+          code={crashReport.code}
+          logs={crashReport.logs}
+          onClose={() => setCrashReport(null)}
+        />
       )}
       <ToastContainer toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
     </>

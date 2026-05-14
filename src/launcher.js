@@ -244,4 +244,4 @@ async function launchMinecraft({ mcToken, uuid, name, mcPath, version, maxRam, m
   return client;
 }
 
-module.exports = { launchMinecraft, syncMods, syncConfigs };
+module.exports = { launchMinecraft, syncMods, syncConfigs, findJava };

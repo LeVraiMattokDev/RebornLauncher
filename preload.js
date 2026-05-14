@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // System info
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
 
+  // Java check
+  checkJava: () => ipcRenderer.invoke('check-java'),
+
   // Skin
   getSkinUrl: (username) => ipcRenderer.invoke('get-skin-url', username),
 
@@ -47,6 +50,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // News
   getNews: () => ipcRenderer.invoke('get-news'),
 
+  // Announcements
+  getAnnouncements: () => ipcRenderer.invoke('get-announcements'),
+
   // Directory picker
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
@@ -58,7 +64,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncFiles: () => ipcRenderer.invoke('sync-files'),
 
   // Minecraft launch
-  launchGame: (opts) => ipcRenderer.invoke('launch-game', opts),
+  launchGame:   (opts) => ipcRenderer.invoke('launch-game', opts),
+  cancelLaunch: ()     => ipcRenderer.invoke('cancel-launch'),
 
   // Event listeners with proper cleanup support
   on: (channel, cb) => {

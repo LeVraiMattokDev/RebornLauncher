@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const net  = require('net');
@@ -56,7 +56,27 @@ function pingMinecraft(host, port = 25565, timeout = 5000) {
   });
 }
 
-let mainWindow = null;
+let mainWindow      = null;
+let tray            = null;
+let activeClient    = null;
+let isQuitting      = false;
+let discord         = null;
+let cancelRequested = false;
+
+// ── Tray ──────────────────────────────────────────────────────────────────────
+function setupTray() {
+  const iconPath = path.join(__dirname, 'assets', 'logo.ico');
+  const icon = nativeImage.createFromPath(iconPath);
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
+  tray.setToolTip('RebornMC Launcher');
+  const menu = Menu.buildFromTemplate([
+    { label: 'Afficher le launcher', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { type: 'separator' },
+    { label: 'Quitter', click: () => { isQuitting = true; app.quit(); } },
+  ]);
+  tray.setContextMenu(menu);
+  tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -77,13 +97,30 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // Intercepte la fermeture — minimise dans le tray
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
+  });
 }
+
+app.on('before-quit', () => { isQuitting = true; });
 
 app.whenReady().then(() => {
   createWindow();
+  setupTray();
+
+  // ── Discord Rich Presence ────────────────────────────────────────────────
+  try {
+    discord = require('./src/discord');
+    discord.initDiscord();
+  } catch (_) {}
 
   // ── Window controls ──────────────────────────────────────────────────────
-  ipcMain.on('window-close',    () => mainWindow?.close());
+  ipcMain.on('window-close',    () => { if (mainWindow) mainWindow.hide(); });
   ipcMain.on('window-minimize', () => mainWindow?.minimize());
   ipcMain.on('window-maximize', () => {
     if (!mainWindow) return;
@@ -120,6 +157,17 @@ app.whenReady().then(() => {
     platform: process.platform,
     arch: process.arch,
   }));
+
+  // ── Java check ────────────────────────────────────────────────────────────
+  ipcMain.handle('check-java', () => {
+    try {
+      const { findJava } = require('./src/launcher');
+      const javaPath = findJava();
+      return { found: true, path: javaPath || 'system' };
+    } catch (e) {
+      return { found: false, error: e.message };
+    }
+  });
 
   // ── Mod list (includes disabled) ──────────────────────────────────────────
   ipcMain.handle('list-mods', () => {
@@ -209,6 +257,21 @@ app.whenReady().then(() => {
     }
   });
 
+  // ── Announcements from GitHub ─────────────────────────────────────────────
+  // Format attendu dans announcements.json du repo :
+  // [{ "id": "promo-1", "active": true, "title": "...", "message": "...", "type": "promo", "url": "https://..." }]
+  ipcMain.handle('get-announcements', async () => {
+    try {
+      const cfg = configModule.load();
+      const { fetchJSON } = require('./src/http');
+      const file = await fetchJSON(`https://api.github.com/repos/${cfg.githubRepo}/contents/announcements.json`);
+      const content = Buffer.from(file.content, 'base64').toString('utf-8');
+      return JSON.parse(content);
+    } catch (_) {
+      return [];
+    }
+  });
+
   // ── Microsoft auth ────────────────────────────────────────────────────────
   const { openAuthWindow, fullAuthFromCode, refreshAuth } = require('./src/msauth');
 
@@ -258,6 +321,31 @@ app.whenReady().then(() => {
     }
   });
 
+  // ── Cancel launch ─────────────────────────────────────────────────────────
+  ipcMain.handle('cancel-launch', () => {
+    cancelRequested = true;
+    const clientToKill = activeClient;
+    activeClient = null;
+
+    if (clientToKill?.proc) {
+      try { clientToKill.proc.kill(); } catch (_) {}
+      return { killed: true };
+    }
+
+    if (clientToKill) {
+      // Download phase — proc pas encore spawn. Poll jusqu'à ce qu'il apparaisse puis kill.
+      const check = setInterval(() => {
+        if (clientToKill.proc) {
+          try { clientToKill.proc.kill(); } catch (_) {}
+          clearInterval(check);
+        }
+      }, 200);
+      setTimeout(() => clearInterval(check), 120000);
+    }
+
+    return { killed: true };
+  });
+
   // ── Minecraft launch ──────────────────────────────────────────────────────
   ipcMain.handle('launch-game', async (event, opts) => {
     const cfg = configModule.load();
@@ -275,12 +363,16 @@ app.whenReady().then(() => {
       }
     }
 
+    cancelRequested = false;
+
     const modsFolder   = path.join(cfg.minecraftPath, 'mods');
     const modBanFolder = path.join(__dirname, 'mod_ban');
     const banResult    = applyModBan(modsFolder, modBanFolder);
 
     try {
-      await launchMinecraft({
+      discord?.setDownloading();
+
+      activeClient = await launchMinecraft({
         mcToken:    msAccount.mcToken,
         uuid:       msAccount.uuid,
         name:       msAccount.name,
@@ -289,14 +381,24 @@ app.whenReady().then(() => {
         maxRam:     opts.maxRam  || cfg.maxRam,
         minRam:     opts.minRam  || cfg.minRam,
         jvmArgs:    cfg.jvmArgs  || '',
-        onProgress: data => event.sender.send('launch-progress', data),
-        onData:     data => event.sender.send('launch-data', data),
+        onProgress: data => { if (!cancelRequested) event.sender.send('launch-progress', data); },
+        onData:     data => { if (!cancelRequested) event.sender.send('launch-data', data); },
         onClose:    code => {
+          if (cancelRequested) { cancelRequested = false; return; }
+          activeClient = null;
+          discord?.setIdle();
           event.sender.send('launch-close', code);
           if (cfg.closeLauncherOnStart && mainWindow) mainWindow.show();
         },
-        onError:    err  => event.sender.send('launch-error', { message: err?.message || String(err) }),
+        onError:    err  => {
+          if (cancelRequested) { cancelRequested = false; return; }
+          activeClient = null;
+          discord?.setIdle();
+          event.sender.send('launch-error', { message: err?.message || String(err) });
+        },
       });
+
+      discord?.setPlaying(msAccount.name);
 
       if (cfg.closeLauncherOnStart && mainWindow) {
         setTimeout(() => mainWindow.minimize(), 2000);
@@ -304,6 +406,8 @@ app.whenReady().then(() => {
 
       return { success: true, bannedMods: banResult.deleted };
     } catch (e) {
+      activeClient = null;
+      discord?.setIdle();
       return { success: false, error: e.message };
     }
   });
@@ -313,7 +417,7 @@ app.whenReady().then(() => {
 
   ipcMain.on('updater-install', () => {
     if (pendingInstallerPath) {
-      shell.openPath(pendingInstallerPath).then(() => app.quit());
+      shell.openPath(pendingInstallerPath).then(() => { isQuitting = true; app.quit(); });
     }
   });
 
@@ -346,5 +450,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin' && isQuitting) {
+    discord?.destroy();
+    app.quit();
+  }
 });

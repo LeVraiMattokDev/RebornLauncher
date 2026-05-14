@@ -1,0 +1,26 @@
+[
+  {
+    "id": "promo-ete-2025",
+    "active": false,
+    "title": "-30% sur tous les grades ce weekend !",
+    "message": "Profite de -30% sur tous les grades jusqu'au dimanche 23h59.",
+    "type": "promo",
+    "url": "https://rebornsmp.fr/shop"
+  },
+  {
+    "id": "event-pvp-juin-2025",
+    "active": false,
+    "title": "Tournoi PvP ce samedi !",
+    "message": "Inscris-toi avant vendredi soir pour participer. Prix à gagner.",
+    "type": "event",
+    "url": "https://discord.gg/rebornmc"
+  },
+  {
+    "id": "nouveau-grade-legend",
+    "active": false,
+    "title": "Nouveau grade LEGEND disponible !",
+    "message": "Le grade légendaire est maintenant disponible en boutique.",
+    "type": "promo",
+    "url": "https://rebornsmp.fr/shop"
+  }
+]
