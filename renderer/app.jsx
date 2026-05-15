@@ -303,8 +303,8 @@ function App() {
     try {
       const res = await window.electronAPI.msAuthStart();
       if (res.success) {
-        const saved = [...(config.savedAccounts || [])];
-        if (msAccount) saved.push(msAccount);
+        const saved = (config.savedAccounts || []).filter(a => a.uuid !== res.account.uuid);
+        if (msAccount && msAccount.uuid !== res.account.uuid) saved.push(msAccount);
         const newCfg = { ...config, msAccount: res.account, savedAccounts: saved };
         setConfig(newCfg);
         window.electronAPI.saveConfig(newCfg);
@@ -445,7 +445,7 @@ function App() {
         <TopBar user={user} onNav={setScreen} version={appVersion} />
         <Sidebar active={screen} onNav={setScreen} />
         <main className="main">{renderScreen()}</main>
-        <StatusBar ping={serverInfo.latency} server={{ up: serverInfo.online, players: serverInfo.players, max: serverInfo.maxPlayers }} />
+        <StatusBar ping={serverInfo.latency} server={{ up: serverInfo.online, players: serverInfo.players, max: serverInfo.maxPlayers }} version={appVersion} />
       </div>
       {showLaunch && (
         <LaunchOverlay

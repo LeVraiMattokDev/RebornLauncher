@@ -55,12 +55,13 @@ async function syncMods({ githubRepo, modsDir, onData, onProgress }) {
     msg(`${remote.name} installé.`);
   }
 
-  // Supprimer mods retirés du dépôt
-  const localJars = fs.readdirSync(modsDir).filter(f => f.endsWith('.jar'));
+  // Supprimer mods retirés du dépôt (y compris les .jar.disabled)
+  const localJars = fs.readdirSync(modsDir).filter(f => f.endsWith('.jar') || f.endsWith('.jar.disabled'));
   for (const local of localJars) {
-    if (!remoteNames.has(local)) {
+    const jarName = local.endsWith('.disabled') ? local.slice(0, -'.disabled'.length) : local;
+    if (!remoteNames.has(jarName)) {
       fs.unlinkSync(path.join(modsDir, local));
-      delete manifest[local];
+      delete manifest[jarName];
       msg(`Mod retiré : ${local}`);
     }
   }

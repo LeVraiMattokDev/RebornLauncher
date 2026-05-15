@@ -59,6 +59,7 @@ function pingMinecraft(host, port = 25565, timeout = 5000) {
 let mainWindow      = null;
 let tray            = null;
 let activeClient    = null;
+let activeGamePid   = null;
 let isQuitting      = false;
 let discord         = null;
 let cancelRequested = false;
@@ -194,7 +195,9 @@ app.whenReady().then(() => {
   ipcMain.handle('toggle-mod', (_e, filename) => {
     const cfg = configModule.load();
     const modsDir = path.join(cfg.minecraftPath, 'mods');
-    const filePath = path.join(modsDir, filename);
+    const safeFilename = path.basename(filename);
+    if (safeFilename !== filename) return { error: 'Nom de fichier invalide.' };
+    const filePath = path.join(modsDir, safeFilename);
     try {
       if (filename.endsWith('.disabled')) {
         const enabledPath = filePath.slice(0, -'.disabled'.length);
@@ -324,26 +327,24 @@ app.whenReady().then(() => {
   // ── Cancel launch ─────────────────────────────────────────────────────────
   ipcMain.handle('cancel-launch', () => {
     cancelRequested = true;
-    const clientToKill = activeClient;
-    activeClient = null;
+    const pidToKill = activeGamePid;
+    activeClient  = null;
+    activeGamePid = null;
 
-    if (clientToKill?.proc) {
-      try { clientToKill.proc.kill(); } catch (_) {}
-      return { killed: true };
-    }
-
-    if (clientToKill) {
-      // Download phase — proc pas encore spawn. Poll jusqu'à ce qu'il apparaisse puis kill.
-      const check = setInterval(() => {
-        if (clientToKill.proc) {
-          try { clientToKill.proc.kill(); } catch (_) {}
-          clearInterval(check);
+    if (pidToKill) {
+      try {
+        if (process.platform === 'win32') {
+          require('child_process').execSync(
+            `taskkill /F /T /PID ${pidToKill}`,
+            { stdio: 'ignore' }
+          );
+        } else {
+          process.kill(-pidToKill, 'SIGKILL');
         }
-      }, 200);
-      setTimeout(() => clearInterval(check), 120000);
+      } catch (_) {}
     }
 
-    return { killed: true };
+    return { killed: !!pidToKill };
   });
 
   // ── Minecraft launch ──────────────────────────────────────────────────────
@@ -364,6 +365,7 @@ app.whenReady().then(() => {
     }
 
     cancelRequested = false;
+    activeGamePid   = null;
 
     const modsFolder   = path.join(cfg.minecraftPath, 'mods');
     const modBanFolder = path.join(__dirname, 'mod_ban');
@@ -385,18 +387,31 @@ app.whenReady().then(() => {
         onData:     data => { if (!cancelRequested) event.sender.send('launch-data', data); },
         onClose:    code => {
           if (cancelRequested) { cancelRequested = false; return; }
-          activeClient = null;
+          activeClient  = null;
+          activeGamePid = null;
           discord?.setIdle();
           event.sender.send('launch-close', code);
           if (cfg.closeLauncherOnStart && mainWindow) mainWindow.show();
         },
         onError:    err  => {
           if (cancelRequested) { cancelRequested = false; return; }
-          activeClient = null;
+          activeClient  = null;
+          activeGamePid = null;
           discord?.setIdle();
           event.sender.send('launch-error', { message: err?.message || String(err) });
         },
       });
+
+      // Capture le PID du processus Java dès qu'il est spawn
+      const pidWatcher = setInterval(() => {
+        if (!activeClient) { clearInterval(pidWatcher); return; }
+        const pid = activeClient.proc?.pid;
+        if (pid) {
+          activeGamePid = pid;
+          clearInterval(pidWatcher);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(pidWatcher), 120000);
 
       discord?.setPlaying(msAccount.name);
 
@@ -406,7 +421,8 @@ app.whenReady().then(() => {
 
       return { success: true, bannedMods: banResult.deleted };
     } catch (e) {
-      activeClient = null;
+      activeClient  = null;
+      activeGamePid = null;
       discord?.setIdle();
       return { success: false, error: e.message };
     }

@@ -19,7 +19,6 @@ const Icon = ({ name, size = 18 }) => {
     spark:    <path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M5 19l4-4M15 9l4-4" />,
     log:      <><path d="M4 6h16M4 12h16M4 18h10" /></>,
     refresh:  <><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></>,
-    crown:    <path d="M3 18h18M3 7l4 5 5-7 5 7 4-5v11H3V7z" />,
     chat:     <path d="M21 12a8 8 0 0 1-12 7l-5 1 1-5a8 8 0 1 1 16-3z" />,
     close:    <><path d="M6 6l12 12M18 6L6 18" /></>,
     edit:     <><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></>,
@@ -27,10 +26,11 @@ const Icon = ({ name, size = 18 }) => {
     trash:    <><path d="M3 6h18M8 6V4h8v2" /><path d="M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" /><path d="M10 11v6M14 11v6" /></>,
     copy:     <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
     warning:  <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></>,
+    server:   <><rect x="2" y="3" width="20" height="4" rx="1" /><rect x="2" y="10" width="20" height="4" rx="1" /><rect x="2" y="17" width="20" height="4" rx="1" /><circle cx="18" cy="5" r="1" fill="currentColor" /><circle cx="18" cy="12" r="1" fill="currentColor" /></>,
   };
   return (
     <svg className="nav-icon" width={size} height={size} viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="1.7"
+      fill="none" stroke="currentColor" strokeWidth="1.65"
       strokeLinecap="round" strokeLinejoin="round">
       {paths[name]}
     </svg>
@@ -38,7 +38,7 @@ const Icon = ({ name, size = 18 }) => {
 };
 
 /* ============== 3D Skin Viewer ============== */
-function SkinViewer3D({ skinUrl, username, width = 200, height = 260 }) {
+function SkinViewer3D({ skinUrl, username, width = 190, height = 250 }) {
   const canvasRef = useRef(null);
   const viewerRef = useRef(null);
 
@@ -49,15 +49,15 @@ function SkinViewer3D({ skinUrl, username, width = 200, height = 260 }) {
         canvas: canvasRef.current, width, height,
       });
       if (viewer.camera) {
-        viewer.camera.rotation.x = -0.2;
-        viewer.camera.position.z = 70;
+        viewer.camera.rotation.x = -0.18;
+        viewer.camera.position.z = 68;
       }
       viewer.autoRotate = true;
-      viewer.autoRotateSpeed = 0.4;
+      viewer.autoRotateSpeed = 0.35;
       if (viewer.controls) viewer.controls.enableZoom = false;
       if (window.skinview3d.WalkingAnimation) {
         const anim = viewer.loadAnimation(window.skinview3d.WalkingAnimation);
-        if (anim) anim.speed = 0.6;
+        if (anim) anim.speed = 0.55;
       }
       viewerRef.current = viewer;
       return () => { try { viewer.dispose(); } catch (_) {} viewerRef.current = null; };
@@ -77,7 +77,7 @@ function SkinViewer3D({ skinUrl, username, width = 200, height = 260 }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <canvas ref={canvasRef} style={{ borderRadius: 8, background: 'transparent' }} />
+      <canvas ref={canvasRef} style={{ borderRadius: 6, background: 'transparent' }} />
     </div>
   );
 }
@@ -87,29 +87,38 @@ function TopBar({ user, onNav, version }) {
   return (
     <div className="topbar">
       <div className="titlebar-drag" />
+
       <div className="brand">
-        <div className="brand-mark"><img src="./assets/logo.png" style={{ width: 22, height: 22, objectFit: 'contain' }} /></div>
-        <div className="brand-text">
+        <div className="brand-mark">
+          <img src="./assets/logo.png" />
+        </div>
+        <div>
           <div className="brand-name">REBORNMC</div>
-          <div className="brand-sub">Launcher v{version}</div>
+          <div className="brand-sub">v{version}</div>
         </div>
       </div>
+
       <div className="topbar-spacer" />
+
       <div className="topbar-actions">
-        <button className="icon-btn" title="Notifications"><Icon name="bell" size={16} /></button>
+        <button className="icon-btn" title="Notifications">
+          <Icon name="bell" size={15} />
+        </button>
       </div>
-      <div className="user-chip" onClick={() => onNav('account')}>
+
+      <div className="user-chip" onClick={() => onNav('account')} title="Mon compte">
         <div className="user-avatar online">{user.initials}</div>
         <div>
           <div className="user-name">{user.name}</div>
-          <div className="user-rank">Microsoft</div>
+          <div className="user-rank">Joueur</div>
         </div>
-        <Icon name="chev" size={14} />
+        <Icon name="chev" size={13} />
       </div>
+
       <div className="titlebar-controls">
-        <button className="wc-btn wc-min" title="Réduire" onClick={() => window.electronAPI.minimizeWindow()} />
-        <button className="wc-btn wc-max" title="Agrandir" onClick={() => window.electronAPI.maximizeWindow()} />
-        <button className="wc-btn wc-close" title="Fermer" onClick={() => window.electronAPI.closeWindow()} />
+        <button className="wc-btn wc-min"   title="Réduire"   onClick={() => window.electronAPI.minimizeWindow()} />
+        <button className="wc-btn wc-max"   title="Agrandir"  onClick={() => window.electronAPI.maximizeWindow()} />
+        <button className="wc-btn wc-close" title="Fermer"    onClick={() => window.electronAPI.closeWindow()} />
       </div>
     </div>
   );
@@ -119,60 +128,62 @@ function TopBar({ user, onNav, version }) {
 function Sidebar({ active, onNav }) {
   const items = [
     { group: "Jouer" },
-    { id: "home",      label: "Accueil",      icon: "home" },
-    { id: "mods",      label: "Mods",         icon: "cube" },
-    { id: "profiles",  label: "Profil",       icon: "layers" },
-    { group: "Serveur" },
-    { id: "store",     label: "Boutique",     icon: "store", badge: "NEW" },
-    { group: "Vous" },
-    { id: "account",   label: "Comptes",      icon: "user" },
-    { id: "settings",  label: "Paramètres",   icon: "cog" },
-    { id: "logs",      label: "Logs",         icon: "log" },
+    { id: "home",      label: "Accueil",        icon: "home" },
+    { id: "store",     label: "Boutique",        icon: "store", badge: "NEW" },
+    { group: "Mon profil" },
+    { id: "account",   label: "Mon compte",      icon: "user" },
+    { id: "profiles",  label: "Performance",     icon: "layers" },
+    { id: "mods",      label: "Extensions",      icon: "cube" },
+    { group: "Aide" },
+    { id: "settings",  label: "Paramètres",      icon: "cog" },
+    { id: "logs",      label: "Diagnostics",     icon: "log" },
   ];
+
   return (
     <div className="sidebar">
       {items.map((it, i) => {
-        if (it.group) return <div key={`g-${i}`} className="nav-label">{it.group}</div>;
+        if (it.group) return <span key={`g-${i}`} className="nav-label">{it.group}</span>;
         return (
-          <button key={it.id}
-            className={`nav-item${active === it.id ? " active" : ""}`}
-            onClick={() => onNav(it.id)} title={it.label}>
-            <Icon name={it.icon} />
+          <button
+            key={it.id}
+            className={`nav-item${active === it.id ? ' active' : ''}`}
+            onClick={() => onNav(it.id)}
+            title={it.label}
+          >
+            <Icon name={it.icon} size={15} />
             <span className="nav-text">{it.label}</span>
             {it.badge && <span className="nav-badge">{it.badge}</span>}
           </button>
         );
       })}
+
       <div style={{ flex: 1 }} />
-      <div style={{
-        padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.06)',
-        marginTop: 8, fontSize: 9, color: 'var(--text-faint)',
-        fontFamily: 'var(--mono-font)', textAlign: 'center', opacity: 0.5,
-      }}>
-        Ctrl+Enter jouer · Ctrl+, paramètres
+      <div className="sidebar-hint">
+        <span className="sidebar-hint-key">Ctrl+Entrée</span> pour jouer
       </div>
     </div>
   );
 }
 
 /* ============== StatusBar ============== */
-function StatusBar({ ping, server }) {
+function StatusBar({ ping, server, version }) {
   return (
     <div className="statusbar">
       <div className="statusbar-item">
-        <span className={`status-dot${server.up ? "" : " err"}`} />
-        <span>{server.up ? "EN LIGNE" : "HORS LIGNE"}</span>
+        <span className={`status-dot${server.up ? '' : ' err'}`} />
+        <span>{server.up ? 'En ligne' : 'Hors ligne'}</span>
       </div>
+      <span className="tick-sep">·</span>
       <div className="statusbar-item">play.rebornmc.fr</div>
-      <div className="tick-sep">·</div>
-      <div className="statusbar-item">{server.up ? `${ping} ms` : "—"}</div>
-      <div className="tick-sep">·</div>
-      <div className="statusbar-item">{server.up ? `${server.players}/${server.max} joueurs` : "—"}</div>
+      <span className="tick-sep">·</span>
+      <div className="statusbar-item">{server.up ? `${ping} ms` : '—'}</div>
+      <span className="tick-sep">·</span>
+      <div className="statusbar-item">{server.up ? `${server.players}/${server.max} joueurs` : '—'}</div>
       <div className="statusbar-spacer" />
       <div className="tick-text">
-        <span>région : EU-West</span>
-        <span className="tick-sep">·</span>
         <span>Ctrl+R actualiser</span>
+        <span className="tick-sep">·</span>
+        <span style={{ color: 'var(--text-2)' }}>v{version}</span>
       </div>
     </div>
   );
@@ -180,7 +191,7 @@ function StatusBar({ ping, server }) {
 
 /* ============== Switch ============== */
 const Switch = ({ on, onChange }) => (
-  <button className={`switch${on ? " on" : ""}`} onClick={() => onChange(!on)} />
+  <button className={`switch${on ? ' on' : ''}`} onClick={() => onChange(!on)} />
 );
 
 /* ============== Toast Container ============== */
@@ -189,16 +200,18 @@ function ToastContainer({ toasts, onDismiss }) {
   return (
     <div className="toast-container">
       {toasts.map(t => (
-        <div key={t.id} className={`toast toast-${t.type || 'info'}`}
+        <div
+          key={t.id}
+          className={`toast toast-${t.type || 'info'}`}
           style={t.url ? { cursor: 'pointer' } : {}}
           onClick={t.url ? () => { window.electronAPI.openUrl(t.url); onDismiss(t.id); } : undefined}
         >
           <div className="toast-content">
             <span className={`toast-icon toast-icon-${t.type || 'info'}`} />
             <span className="toast-msg">{t.message}</span>
-            {t.url && <span style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 4 }}>↗</span>}
+            {t.url && <span style={{ fontSize: 10, color: 'var(--accent-2)', marginLeft: 4 }}>↗</span>}
           </div>
-          <button className="toast-close" onClick={(e) => { e.stopPropagation(); onDismiss(t.id); }}>×</button>
+          <button className="toast-close" onClick={e => { e.stopPropagation(); onDismiss(t.id); }}>×</button>
         </div>
       ))}
     </div>
@@ -211,7 +224,7 @@ function SplashScreen({ version, status }) {
     <div className="splash-overlay">
       <div className="splash-content">
         <div className="splash-logo">
-          <img src="./assets/logo.png" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+          <img src="./assets/logo.png" alt="RebornMC" />
         </div>
         <div className="splash-title">REBORNMC</div>
         <div className="splash-version">{version ? `v${version}` : ''}</div>

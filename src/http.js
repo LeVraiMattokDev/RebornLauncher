@@ -50,8 +50,8 @@ function downloadFile(url, dest, onProgress) {
           if (total > 0 && onProgress) onProgress(Math.round((downloaded / total) * 100));
         });
         res.on('end', () => file.end(() => resolve()));
-        res.on('error', err => { fs.unlink(dest, () => {}); reject(err); });
-        file.on('error', err => { fs.unlink(dest, () => {}); reject(err); });
+        res.on('error', err => { file.destroy(); fs.unlink(dest, () => {}); reject(err); });
+        file.on('error', err => { file.destroy(); fs.unlink(dest, () => {}); reject(err); });
       }).on('error', err => { fs.unlink(dest, () => {}); reject(err); });
     }
     attempt(url);
