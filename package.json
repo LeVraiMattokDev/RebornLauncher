@@ -6,8 +6,10 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder",
-    "publish": "electron-builder --publish always"
+    "build": "electron-builder --win --linux",
+    "build:mac": "electron-builder --mac",
+    "publish": "electron-builder --win --linux --publish always",
+    "publish:mac": "electron-builder --mac --publish always"
   },
   "build": {
     "appId": "fr.rebornmc.launcher",
@@ -21,6 +23,15 @@
     "win": {
       "target": "nsis",
       "icon": "assets/logo.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb", "pacman"],
+      "icon": "assets/logo.png",
+      "category": "Game"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/logo.png"
     },
     "files": [
       "main.js",

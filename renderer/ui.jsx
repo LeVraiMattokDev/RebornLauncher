@@ -1,5 +1,5 @@
 /* global React */
-const { useState, useEffect, useRef } = React;
+const { useState } = React;
 
 /* ============== ICONS ============== */
 const Icon = ({ name, size = 18 }) => {
@@ -27,6 +27,7 @@ const Icon = ({ name, size = 18 }) => {
     copy:     <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
     warning:  <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></>,
     server:   <><rect x="2" y="3" width="20" height="4" rx="1" /><rect x="2" y="10" width="20" height="4" rx="1" /><rect x="2" y="17" width="20" height="4" rx="1" /><circle cx="18" cy="5" r="1" fill="currentColor" /><circle cx="18" cy="12" r="1" fill="currentColor" /></>,
+    notes:    <><path d="M9 12h6M9 8h6M9 16h4" /><rect x="3" y="3" width="18" height="18" rx="3" /></>,
   };
   return (
     <svg className="nav-icon" width={size} height={size} viewBox="0 0 24 24"
@@ -36,51 +37,6 @@ const Icon = ({ name, size = 18 }) => {
     </svg>
   );
 };
-
-/* ============== 3D Skin Viewer ============== */
-function SkinViewer3D({ skinUrl, username, width = 190, height = 250 }) {
-  const canvasRef = useRef(null);
-  const viewerRef = useRef(null);
-
-  useEffect(() => {
-    if (!canvasRef.current || !window.skinview3d) return;
-    try {
-      const viewer = new window.skinview3d.SkinViewer({
-        canvas: canvasRef.current, width, height,
-      });
-      if (viewer.camera) {
-        viewer.camera.rotation.x = -0.18;
-        viewer.camera.position.z = 68;
-      }
-      viewer.autoRotate = true;
-      viewer.autoRotateSpeed = 0.35;
-      if (viewer.controls) viewer.controls.enableZoom = false;
-      if (window.skinview3d.WalkingAnimation) {
-        const anim = viewer.loadAnimation(window.skinview3d.WalkingAnimation);
-        if (anim) anim.speed = 0.55;
-      }
-      viewerRef.current = viewer;
-      return () => { try { viewer.dispose(); } catch (_) {} viewerRef.current = null; };
-    } catch (e) { console.warn('SkinViewer3D init failed:', e.message); }
-  }, []);
-
-  useEffect(() => {
-    if (!viewerRef.current) return;
-    const steve = 'https://crafatar.com/skins/8667ba71-b85a-4004-af54-457a9734eed7';
-    const url = skinUrl || steve;
-    try {
-      viewerRef.current.loadSkin(url).catch(() => {
-        if (viewerRef.current) viewerRef.current.loadSkin(steve).catch(() => {});
-      });
-    } catch (e) { console.warn('SkinViewer3D loadSkin failed:', e.message); }
-  }, [skinUrl]);
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <canvas ref={canvasRef} style={{ borderRadius: 6, background: 'transparent' }} />
-    </div>
-  );
-}
 
 /* ============== TopBar ============== */
 function TopBar({ user, onNav, version }) {
@@ -116,9 +72,20 @@ function TopBar({ user, onNav, version }) {
       </div>
 
       <div className="titlebar-controls">
-        <button className="wc-btn wc-min"   title="Réduire"   onClick={() => window.electronAPI.minimizeWindow()} />
-        <button className="wc-btn wc-max"   title="Agrandir"  onClick={() => window.electronAPI.maximizeWindow()} />
-        <button className="wc-btn wc-close" title="Fermer"    onClick={() => window.electronAPI.closeWindow()} />
+        <button className="wc-btn wc-min" title="Réduire" onClick={() => window.electronAPI.minimizeWindow()}>
+          <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1" /></svg>
+        </button>
+        <button className="wc-btn wc-max" title="Agrandir" onClick={() => window.electronAPI.maximizeWindow()}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+            <rect x="0.5" y="0.5" width="9" height="9" />
+          </svg>
+        </button>
+        <button className="wc-btn wc-close" title="Fermer" onClick={() => window.electronAPI.closeWindow()}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round">
+            <line x1="0.5" y1="0.5" x2="9.5" y2="9.5" />
+            <line x1="9.5" y1="0.5" x2="0.5" y2="9.5" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -128,15 +95,16 @@ function TopBar({ user, onNav, version }) {
 function Sidebar({ active, onNav }) {
   const items = [
     { group: "Jouer" },
-    { id: "home",      label: "Accueil",        icon: "home" },
-    { id: "store",     label: "Boutique",        icon: "store", badge: "NEW" },
+    { id: "home",       label: "Accueil",        icon: "home" },
+    { id: "patchnotes", label: "Patch Notes",    icon: "notes" },
+    { id: "store",      label: "Boutique",        icon: "store" },
     { group: "Mon profil" },
-    { id: "account",   label: "Mon compte",      icon: "user" },
-    { id: "profiles",  label: "Performance",     icon: "layers" },
-    { id: "mods",      label: "Extensions",      icon: "cube" },
+    { id: "account",    label: "Mon compte",      icon: "user" },
+    { id: "profiles",   label: "Performance",     icon: "layers" },
+    { id: "mods",       label: "Extensions",      icon: "cube" },
     { group: "Aide" },
-    { id: "settings",  label: "Paramètres",      icon: "cog" },
-    { id: "logs",      label: "Diagnostics",     icon: "log" },
+    { id: "settings",   label: "Paramètres",      icon: "cog" },
+    { id: "logs",       label: "Diagnostics",     icon: "log" },
   ];
 
   return (
@@ -235,4 +203,4 @@ function SplashScreen({ version, status }) {
   );
 }
 
-Object.assign(window, { Icon, SkinViewer3D, TopBar, Sidebar, StatusBar, Switch, ToastContainer, SplashScreen });
+Object.assign(window, { Icon, TopBar, Sidebar, StatusBar, Switch, ToastContainer, SplashScreen });

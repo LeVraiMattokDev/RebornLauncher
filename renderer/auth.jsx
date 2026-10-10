@@ -13,7 +13,7 @@ function AuthScreen({ onAuth, version }) {
       if (res.success) {
         onAuth(res.account);
       } else {
-        setError(res.error || 'Connexion échouée.');
+        setError(res.error || 'Connexion échouée');
       }
     } catch (e) {
       setError(e.message || 'Erreur inattendue.');
@@ -25,11 +25,22 @@ function AuthScreen({ onAuth, version }) {
   return (
     <div className="auth-overlay">
       {/* Drag region + window controls */}
-      <div className="titlebar-drag" style={{ position: 'fixed', top: 0, left: 0, right: 80, height: 36, zIndex: 10001 }} />
-      <div className="titlebar-controls" style={{ position: 'fixed', top: 8, right: 12, zIndex: 10001 }}>
-        <button className="wc-btn wc-min"   title="Réduire"  onClick={() => window.electronAPI.minimizeWindow()} />
-        <button className="wc-btn wc-max"   title="Agrandir" onClick={() => window.electronAPI.maximizeWindow()} />
-        <button className="wc-btn wc-close" title="Fermer"   onClick={() => window.electronAPI.closeWindow()} />
+      <div className="titlebar-drag" style={{ position: 'fixed', top: 0, left: 0, right: 138, height: 44, zIndex: 10001 }} />
+      <div className="titlebar-controls" style={{ position: 'fixed', top: 0, right: 0, zIndex: 10001 }}>
+        <button className="wc-btn wc-min" title="Réduire" onClick={() => window.electronAPI.minimizeWindow()}>
+          <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1" /></svg>
+        </button>
+        <button className="wc-btn wc-max" title="Agrandir" onClick={() => window.electronAPI.maximizeWindow()}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+            <rect x="0.5" y="0.5" width="9" height="9" />
+          </svg>
+        </button>
+        <button className="wc-btn wc-close" title="Fermer" onClick={() => window.electronAPI.closeWindow()}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round">
+            <line x1="0.5" y1="0.5" x2="9.5" y2="9.5" />
+            <line x1="9.5" y1="0.5" x2="0.5" y2="9.5" />
+          </svg>
+        </button>
       </div>
 
       <div className="auth-box">

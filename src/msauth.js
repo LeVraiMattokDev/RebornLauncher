@@ -170,9 +170,14 @@ function openAuthWindow(parentWindow) {
       width: 520,
       height: 680,
       parent: parentWindow || undefined,
-      modal: !!parentWindow,
+      // modal + frameless parent gèle la fenêtre sur Linux
+      modal: process.platform === 'win32' && !!parentWindow,
       show: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true },
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        partition: `msauth-${Date.now()}`,
+      },
       title: 'Connexion Microsoft',
     });
 
@@ -181,7 +186,7 @@ function openAuthWindow(parentWindow) {
     let resolved = false;
 
     function handleUrl(url) {
-      if (!url.startsWith(REDIRECT)) return;
+      if (!url || !url.startsWith(REDIRECT)) return;
       if (resolved) return;
       resolved = true;
       const u     = new URL(url);
@@ -192,8 +197,13 @@ function openAuthWindow(parentWindow) {
       else reject(new Error(error || 'Connexion annulée.'));
     }
 
-    win.webContents.on('will-redirect', (_e, url) => handleUrl(url));
-    win.webContents.on('will-navigate', (_e, url) => handleUrl(url));
+    // Sur Linux, will-redirect seul ne capture pas toujours le redirect OAuth
+    win.webContents.on('will-redirect',          (_e, url) => handleUrl(url));
+    win.webContents.on('will-navigate',           (_e, url) => handleUrl(url));
+    win.webContents.on('did-navigate',            (_e, url) => handleUrl(url));
+    win.webContents.on('did-redirect-navigation', (_e, url) => handleUrl(url));
+    win.webContents.on('did-navigate-in-page',    (_e, url) => handleUrl(url));
+
     win.on('closed', () => {
       if (!resolved) { resolved = true; reject(new Error('Connexion annulée.')); }
     });

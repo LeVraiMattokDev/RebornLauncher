@@ -1,8 +1,49 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, nativeImage } = require('electron');
-const path = require('path');
-const fs   = require('fs');
-const net  = require('net');
-const os   = require('os');
+const path  = require('path');
+const fs    = require('fs');
+const net   = require('net');
+const os    = require('os');
+const https = require('https');
+const http  = require('http');
+
+// Fix GPU shader disk cache permission errors on Windows
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+}
+
+function getAppIcon() {
+  if (process.platform !== 'win32') {
+    const png = path.join(__dirname, 'assets', 'logo.png');
+    if (fs.existsSync(png)) return png;
+    if (process.platform === 'darwin') {
+      const icns = path.join(__dirname, 'assets', 'logo.icns');
+      if (fs.existsSync(icns)) return icns;
+    }
+  }
+  return path.join(__dirname, 'assets', 'logo.ico');
+}
+
+// ── Fetch URL as base64 data URL (main process, pas de CORS) ─────────────────
+function fetchAsDataUrl(url, redirects = 0) {
+  if (redirects > 5) return Promise.reject(new Error('Too many redirects'));
+  const lib = url.startsWith('https') ? https : http;
+  return new Promise((resolve, reject) => {
+    lib.get(url, { headers: { 'User-Agent': 'RebornLauncher/2.0' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchAsDataUrl(res.headers.location, redirects + 1).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        const ct  = res.headers['content-type'] || 'image/png';
+        resolve(`data:${ct};base64,${buf.toString('base64')}`);
+      });
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
 
 // ── Minecraft server ping ─────────────────────────────────────────────────────
 function writeVarInt(v) {
@@ -64,9 +105,23 @@ let isQuitting      = false;
 let discord         = null;
 let cancelRequested = false;
 
+// ── Single instance lock ──────────────────────────────────────────────────────
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // ── Tray ──────────────────────────────────────────────────────────────────────
 function setupTray() {
-  const iconPath = path.join(__dirname, 'assets', 'logo.ico');
+  const iconPath = getAppIcon();
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip('RebornMC Launcher');
@@ -85,7 +140,7 @@ function createWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 680,
-    icon: path.join(__dirname, 'assets', 'logo.ico'),
+    icon: getAppIcon(),
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#080B12',
@@ -136,9 +191,17 @@ app.whenReady().then(() => {
   ipcMain.handle('get-config',  ()        => configModule.load());
   ipcMain.handle('save-config', (_e, cfg) => { configModule.save(cfg); return true; });
 
-  // ── Skin lookup ───────────────────────────────────────────────────────────
+  // ── Skin lookup (data URL pour éviter CORS renderer) ─────────────────────
   const { getSkinUrl } = require('./src/updater');
-  ipcMain.handle('get-skin-url', (_e, username) => getSkinUrl(username));
+  ipcMain.handle('get-skin-url', async (_e, username) => {
+    try {
+      const url = await getSkinUrl(username);
+      if (!url) return null;
+      return await fetchAsDataUrl(url);
+    } catch (_) {
+      return null;
+    }
+  });
 
   ipcMain.handle('open-url', (_e, url) => { shell.openExternal(url); });
 
@@ -433,6 +496,9 @@ app.whenReady().then(() => {
 
   ipcMain.on('updater-install', () => {
     if (pendingInstallerPath) {
+      if (process.platform === 'linux') {
+        try { fs.chmodSync(pendingInstallerPath, 0o755); } catch (_) {}
+      }
       shell.openPath(pendingInstallerPath).then(() => { isQuitting = true; app.quit(); });
     }
   });

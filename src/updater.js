@@ -8,7 +8,10 @@ async function checkForUpdates(currentVersion) {
     const latest = (data.tag_name || '').replace(/^v/, '');
     if (!latest || latest === currentVersion) return { available: false };
 
-    const asset = (data.assets || []).find(a => a.name.endsWith('.exe'));
+    const ext = process.platform === 'win32' ? '.exe'
+              : process.platform === 'darwin' ? '.dmg'
+              : '.AppImage';
+    const asset = (data.assets || []).find(a => a.name.endsWith(ext));
     if (!asset) return { available: false };
 
     return {
@@ -27,13 +30,8 @@ function downloadUpdate(url, dest, onProgress) {
 }
 
 async function getSkinUrl(username) {
-  try {
-    const profile = await fetchJSON(`https://api.mojang.com/users/profiles/minecraft/${username}`);
-    if (profile && profile.id) {
-      return `https://crafatar.com/skins/${profile.id}?overlay`;
-    }
-  } catch (_) {}
-  return null;
+  // minotar.net : accepte directement le username, pas de lookup UUID requis
+  return `https://minotar.net/skin/${encodeURIComponent(username)}`;
 }
 
 module.exports = { checkForUpdates, downloadUpdate, getSkinUrl };

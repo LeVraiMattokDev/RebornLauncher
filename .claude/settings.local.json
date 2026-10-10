@@ -16,7 +16,11 @@
       "Bash(cp /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/node_modules/react-dom/umd/react-dom.development.js /c/Users/Mattok/Documents/Code/PinStudios/RebornSMP/RebornLauncher/RebornLauncher/renderer/vendor/)",
       "Bash(npm start:*)",
       "Bash(disown)",
-      "Bash(timeout 15 bash:*)"
+      "Bash(timeout 15 bash:*)",
+      "Bash(dir \"c:\\\\Users\\\\Mattok\\\\Documents\\\\Code\\\\PinStudios\\\\RebornSMP\\\\RebornLauncher\\\\RebornLauncher\\\\src\")",
+      "Bash(powershell -command \"\\(Get-Item 'c:\\\\Users\\\\Mattok\\\\Documents\\\\Code\\\\PinStudios\\\\RebornSMP\\\\RebornLauncher\\\\RebornLauncher\\\\renderer\\\\vendor\\\\skinview3d.bundle.js'\\).Length\")",
+      "Bash(powershell -command \"Select-String -Path 'c:\\\\Users\\\\Mattok\\\\Documents\\\\Code\\\\PinStudios\\\\RebornSMP\\\\RebornLauncher\\\\RebornLauncher\\\\renderer\\\\vendor\\\\skinview3d.bundle.js' -Pattern 'SkinViewer|skinview3d|exports\\\\.' -List | Select-Object -First 5\")",
+      "Bash(powershell -command \"Get-Content 'c:\\\\Users\\\\Mattok\\\\Documents\\\\Code\\\\PinStudios\\\\RebornSMP\\\\RebornLauncher\\\\RebornLauncher\\\\renderer\\\\vendor\\\\skinview3d.bundle.js' | Select-Object -First 5\")"
     ]
   },
   "disabledMcpjsonServers": [

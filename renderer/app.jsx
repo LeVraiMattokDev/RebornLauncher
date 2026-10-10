@@ -1,6 +1,6 @@
 /* global React, ReactDOM,
    TopBar, Sidebar, StatusBar, AuthScreen, SplashScreen, ToastContainer,
-   HomeScreen, ModsScreen, ProfileScreen, StoreScreen, SettingsScreen,
+   HomeScreen, ModsScreen, ProfileScreen, StoreScreen, PatchNotesScreen, SettingsScreen,
    AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay, CrashReporter */
 
 const { useState, useEffect, useRef } = React;
@@ -43,7 +43,6 @@ function App() {
   const [appVersion, setAppVersion]     = useState('');
   const [authed, setAuthed]             = useState(false);
   const [msAccount, setMsAccount]       = useState(null);
-  const [skinUrl, setSkinUrl]           = useState(null);
   const [screen, setScreen]             = useState('home');
   const [update, setUpdate]             = useState(null);
   const [launchState, setLaunchState]   = useState({ running: false, progress: 0, stage: '', logs: [] });
@@ -105,14 +104,12 @@ function App() {
                 window.electronAPI.saveConfig(newCfg);
                 setMsAccount(res.account);
                 setAuthed(true);
-                window.electronAPI.getSkinUrl(res.account.name).then(setSkinUrl);
                 addLog('INFO', `Authentifié : ${res.account.name}`);
               }
             } catch (_) { addLog('WARN', 'Token expiré — reconnexion nécessaire'); }
           } else {
             setMsAccount(saved);
             setAuthed(true);
-            window.electronAPI.getSkinUrl(saved.name).then(setSkinUrl);
             addLog('INFO', `Authentifié : ${saved.name}`);
           }
         }
@@ -280,7 +277,6 @@ function App() {
   function handleAuth(account) {
     setMsAccount(account);
     setAuthed(true);
-    window.electronAPI.getSkinUrl(account.name).then(setSkinUrl);
     const newCfg = { ...config, msAccount: account };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
@@ -291,7 +287,6 @@ function App() {
   function handleLogout() {
     setMsAccount(null);
     setAuthed(false);
-    setSkinUrl(null);
     const newCfg = { ...config, msAccount: null };
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
@@ -309,8 +304,6 @@ function App() {
         setConfig(newCfg);
         window.electronAPI.saveConfig(newCfg);
         setMsAccount(res.account);
-        setSkinUrl(null);
-        window.electronAPI.getSkinUrl(res.account.name).then(setSkinUrl);
         addToast(`Compte ${res.account.name} ajouté`, 'success');
         addLog('INFO', `Nouveau compte : ${res.account.name}`);
       } else {
@@ -326,8 +319,6 @@ function App() {
     setConfig(newCfg);
     window.electronAPI.saveConfig(newCfg);
     setMsAccount(account);
-    setSkinUrl(null);
-    window.electronAPI.getSkinUrl(account.name).then(setSkinUrl);
     addToast(`Compte changé : ${account.name}`, 'success');
     addLog('INFO', `Compte changé : ${account.name}`);
   }
@@ -427,14 +418,15 @@ function App() {
 
   const renderScreen = () => {
     switch (screen) {
-      case 'home':     return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} mcVersion={config.minecraftVersion} addToast={addToast} />;
-      case 'mods':     return <ModsScreen addToast={addToast} />;
-      case 'profiles': return <ProfileScreen config={config} onSave={handleConfigSave} />;
-      case 'store':    return <StoreScreen />;
-      case 'account':  return <AccountScreen msAccount={msAccount} config={config} onLogout={handleLogout} onAddAccount={handleAddAccount} onSwitchAccount={handleSwitchAccount} onRemoveAccount={handleRemoveAccount} addToast={addToast} />;
-      case 'settings': return <SettingsScreen config={config} onSave={handleConfigSave} systemInfo={systemInfo} addToast={addToast} />;
-      case 'logs':     return <LogsScreen logs={globalLogs} addToast={addToast} />;
-      default:         return <HomeScreen onPlay={handlePlay} username={username} skinUrl={skinUrl} serverInfo={serverInfo} addToast={addToast} />;
+      case 'home':       return <HomeScreen onPlay={handlePlay} username={username} serverInfo={serverInfo} mcVersion={config.minecraftVersion} addToast={addToast} />;
+      case 'mods':       return <ModsScreen addToast={addToast} />;
+      case 'profiles':   return <ProfileScreen config={config} onSave={handleConfigSave} />;
+      case 'store':      return <StoreScreen />;
+      case 'patchnotes': return <PatchNotesScreen />;
+      case 'account':    return <AccountScreen msAccount={msAccount} config={config} onLogout={handleLogout} onAddAccount={handleAddAccount} onSwitchAccount={handleSwitchAccount} onRemoveAccount={handleRemoveAccount} addToast={addToast} />;
+      case 'settings':   return <SettingsScreen config={config} onSave={handleConfigSave} systemInfo={systemInfo} addToast={addToast} />;
+      case 'logs':       return <LogsScreen logs={globalLogs} addToast={addToast} />;
+      default:           return <HomeScreen onPlay={handlePlay} username={username} serverInfo={serverInfo} addToast={addToast} />;
     }
   };
 

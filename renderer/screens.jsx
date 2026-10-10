@@ -1,8 +1,8 @@
-/* global React, Icon, SkinViewer3D, Switch */
+/* global React, Icon, Switch */
 const { useState, useRef, useEffect } = React;
 
 /* ============ HOME ============ */
-function HomeScreen({ onPlay, username, skinUrl, serverInfo = {}, mcVersion = '1.21.8', addToast }) {
+function HomeScreen({ onPlay, username, serverInfo = {}, mcVersion = '1.21.8', addToast }) {
   const online  = serverInfo.online  ?? false;
   const players = serverInfo.players ?? 0;
   const max     = serverInfo.maxPlayers ?? 0;
@@ -49,14 +49,6 @@ function HomeScreen({ onPlay, username, skinUrl, serverInfo = {}, mcVersion = '1
           </div>
         </div>
 
-        {/* Skin viewer */}
-        <div className="avatar-stage">
-          <SkinViewer3D skinUrl={skinUrl} username={username} width={190} height={245} />
-          <div className="avatar-controls">
-            <div className="avatar-name">{username || 'Joueur'}</div>
-            <div className="avatar-rank">Joueur</div>
-          </div>
-        </div>
       </div>
 
       {/* ── Stats ── */}
@@ -124,8 +116,12 @@ function HomeScreen({ onPlay, username, skinUrl, serverInfo = {}, mcVersion = '1
           <Icon name="chat" size={14} /> Discord
         </button>
         <button className="btn" style={{ flex: 1, justifyContent: 'center', height: 38 }}
-          onClick={() => window.electronAPI.openUrl('https://rebornsmp.fr')}>
+          onClick={() => window.electronAPI.openUrl('https://rebornmc.fr')}>
           <Icon name="spark" size={14} /> Site web
+        </button>
+        <button className="btn" style={{ flex: 1, justifyContent: 'center', height: 38 }}
+          onClick={() => window.electronAPI.openUrl('https://rebornmc.fr/shop')}>
+          <Icon name="store" size={14} /> Boutique
         </button>
       </div>
     </div>
@@ -280,28 +276,92 @@ function ProfileScreen({ config, onSave }) {
   );
 }
 
+/* ============ PATCH NOTES ============ */
+function PatchNotesScreen() {
+  const [loaded, setLoaded] = useState(false);
+  const webviewRef = useRef(null);
+
+  useEffect(() => {
+    const el = webviewRef.current;
+    if (!el) return;
+    const onLoad = () => setLoaded(true);
+    el.addEventListener('did-finish-load', onLoad);
+    return () => el.removeEventListener('did-finish-load', onLoad);
+  }, []);
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+      {!loaded && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 1,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14,
+          background: 'var(--bg)',
+        }}>
+          <div style={{
+            width: 58, height: 58, borderRadius: 16,
+            background: 'var(--accent-bg)', border: '1px solid var(--accent-bdr)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="notes" size={26} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 6 }}>Mises à jour</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>Chargement…</div>
+          </div>
+          <div className="splash-spinner" />
+        </div>
+      )}
+      <webview
+        ref={webviewRef}
+        src="https://rebornmc.fr/patch-notes"
+        style={{ flex: 1, width: '100%' }}
+        allowpopups="true"
+      />
+    </div>
+  );
+}
+
 /* ============ STORE ============ */
 function StoreScreen() {
+  const [loaded, setLoaded] = useState(false);
+  const webviewRef = useRef(null);
+
+  useEffect(() => {
+    const el = webviewRef.current;
+    if (!el) return;
+    const onLoad = () => setLoaded(true);
+    el.addEventListener('did-finish-load', onLoad);
+    return () => el.removeEventListener('did-finish-load', onLoad);
+  }, []);
+
   return (
-    <div className="main-inner" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
-      <div style={{
-        width: 68, height: 68, borderRadius: 18,
-        background: 'var(--accent-bg)', border: '1px solid var(--accent-bdr)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-      }}>
-        <Icon name="store" size={28} />
-      </div>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>Boutique</div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px', letterSpacing: '-0.02em' }}>Boutique RebornMC</h1>
-        <p style={{ color: 'var(--text-2)', margin: 0, maxWidth: 300, lineHeight: 1.6, fontSize: 13 }}>
-          Grades, cosmétiques et avantages pour améliorer ton expérience sur le serveur.
-        </p>
-      </div>
-      <button className="btn btn-primary" style={{ height: 42, padding: '0 26px', fontSize: 14, borderRadius: 11 }}
-        onClick={() => window.electronAPI.openUrl('https://rebornsmp.fr/shop')}>
-        <Icon name="spark" size={15} /> Ouvrir la boutique
-      </button>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+      {!loaded && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 1,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14,
+          background: 'var(--bg)',
+        }}>
+          <div style={{
+            width: 58, height: 58, borderRadius: 16,
+            background: 'var(--accent-bg)', border: '1px solid var(--accent-bdr)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="store" size={26} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 6 }}>Boutique</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>Chargement…</div>
+          </div>
+          <div className="splash-spinner" />
+        </div>
+      )}
+      <webview
+        ref={webviewRef}
+        src="https://rebornmc.fr/shop"
+        style={{ flex: 1, width: '100%' }}
+        allowpopups="true"
+      />
     </div>
   );
 }
@@ -466,11 +526,13 @@ function LaunchOverlay({ state, onClose, onCancel }) {
             </div>
           ))}
         </div>
-        {!running && (
-          <div className="patch-actions">
+        <div className="patch-actions">
+          {running ? (
+            <button className="btn btn-sm btn-ghost" onClick={onCancel}>Annuler</button>
+          ) : (
             <button className="btn btn-primary btn-sm" onClick={onClose}>Fermer</button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -529,6 +591,6 @@ function PlaceholderScreen({ title, subtitle }) {
 }
 
 Object.assign(window, {
-  HomeScreen, ModsScreen, ProfileScreen, StoreScreen,
+  HomeScreen, ModsScreen, ProfileScreen, StoreScreen, PatchNotesScreen,
   AccountScreen, PlaceholderScreen, LogsScreen, LaunchOverlay, CrashReporter,
 });

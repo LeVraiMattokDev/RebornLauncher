@@ -165,6 +165,30 @@ function findJava() {
         if (fs.existsSync(bin)) return bin;
       }
     }
+  } else if (process.platform === 'darwin') {
+    const bases = [
+      '/Library/Java/JavaVirtualMachines',
+      path.join(require('os').homedir(), 'Library/Java/JavaVirtualMachines'),
+    ];
+    for (const base of bases) {
+      if (!fs.existsSync(base)) continue;
+      for (const dir of fs.readdirSync(base)) {
+        const bin = path.join(base, dir, 'Contents', 'Home', 'bin', 'java');
+        if (fs.existsSync(bin)) return bin;
+      }
+    }
+    for (const p of ['/opt/homebrew/opt/openjdk/bin/java', '/usr/local/opt/openjdk/bin/java']) {
+      if (fs.existsSync(p)) return p;
+    }
+  } else {
+    // Linux
+    for (const base of ['/usr/lib/jvm', '/usr/local/lib/jvm', '/opt/java', '/opt/jdk']) {
+      if (!fs.existsSync(base)) continue;
+      for (const dir of fs.readdirSync(base)) {
+        const bin = path.join(base, dir, 'bin', 'java');
+        if (fs.existsSync(bin)) return bin;
+      }
+    }
   }
 
   throw new Error(

@@ -11,6 +11,16 @@ publish:
 win:
   target: nsis
   icon: assets/logo.ico
+linux:
+  target:
+    - AppImage
+    - deb
+    - pacman
+  icon: assets/logo.png
+  category: Game
+mac:
+  target: dmg
+  icon: assets/logo.png
 files:
   - filter:
       - main.js
